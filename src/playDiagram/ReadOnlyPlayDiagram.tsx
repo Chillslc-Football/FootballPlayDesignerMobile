@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import Svg, {
   Circle,
   Defs,
@@ -34,6 +34,8 @@ import { getRouteVertices } from './utils/routeGeometry';
 
 type ReadOnlyPlayDiagramProps = {
   play: RenderPlay;
+  compact?: boolean;
+  style?: StyleProp<ViewStyle>;
 };
 
 type PathStroke = {
@@ -140,7 +142,7 @@ function renderDefenderRoutes(play: RenderPlay, arrowMarkerId: string) {
   });
 }
 
-function renderPlayerMarker(player: Player) {
+function renderPlayerMarker(player: Player, compact: boolean) {
   const { x, y } = player.position;
 
   return (
@@ -160,7 +162,7 @@ function renderPlayerMarker(player: Player) {
       >
         O
       </SvgText>
-      {player.label ? (
+      {!compact && player.label ? (
         <SvgText
           y={PLAYBOOK_LABEL_OFFSET}
           fill={fieldTheme.labelText}
@@ -175,7 +177,7 @@ function renderPlayerMarker(player: Player) {
   );
 }
 
-function renderDefenderMarker(defender: RenderPlay['defenders'][number]) {
+function renderDefenderMarker(defender: RenderPlay['defenders'][number], compact: boolean) {
   const { x, y } = defender.position;
 
   return (
@@ -195,7 +197,7 @@ function renderDefenderMarker(defender: RenderPlay['defenders'][number]) {
       >
         X
       </SvgText>
-      {defender.label ? (
+      {!compact && defender.label ? (
         <SvgText
           y={PLAYBOOK_LABEL_OFFSET}
           fill={fieldTheme.labelText}
@@ -210,7 +212,11 @@ function renderDefenderMarker(defender: RenderPlay['defenders'][number]) {
   );
 }
 
-export function ReadOnlyPlayDiagram({ play }: ReadOnlyPlayDiagramProps) {
+export function ReadOnlyPlayDiagram({
+  play,
+  compact = false,
+  style,
+}: ReadOnlyPlayDiagramProps) {
   const arrowMarkerId = `route-arrow-${play.id}`;
 
   const previewPlay = useMemo(
@@ -227,15 +233,22 @@ export function ReadOnlyPlayDiagram({ play }: ReadOnlyPlayDiagramProps) {
   const hashMarks = useMemo(() => getHashMarks(), []);
 
   const turfStripes = useMemo(() => {
+    if (compact) {
+      return [];
+    }
+
     const stripes: Array<{ y: number; light: boolean }> = [];
     for (let y = 0; y < FIELD_LENGTH; y += 5) {
       stripes.push({ y, light: Math.floor(y / 5) % 2 === 0 });
     }
     return stripes;
-  }, []);
+  }, [compact]);
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[styles.container, compact && styles.containerCompact, style]}
+      pointerEvents="none"
+    >
       <Svg
         width="100%"
         height="100%"
@@ -304,17 +317,19 @@ export function ReadOnlyPlayDiagram({ play }: ReadOnlyPlayDiagramProps) {
             />
           ))}
 
-          {hashMarks.map((mark) => (
-            <Line
-              key={`hash-${mark.viewY}-${mark.x}`}
-              x1={mark.x}
-              y1={mark.viewY - 0.4}
-              x2={mark.x}
-              y2={mark.viewY + 0.4}
-              stroke={fieldTheme.line}
-              strokeWidth={0.12}
-            />
-          ))}
+          {hashMarks.map((mark) =>
+            compact ? null : (
+              <Line
+                key={`hash-${mark.viewY}-${mark.x}`}
+                x1={mark.x}
+                y1={mark.viewY - 0.4}
+                x2={mark.x}
+                y2={mark.viewY + 0.4}
+                stroke={fieldTheme.line}
+                strokeWidth={0.12}
+              />
+            ),
+          )}
 
           <Line
             x1={0}
@@ -327,8 +342,8 @@ export function ReadOnlyPlayDiagram({ play }: ReadOnlyPlayDiagramProps) {
 
           {renderOffenseActions(previewPlay, arrowMarkerId)}
           {renderDefenderRoutes(previewPlay, arrowMarkerId)}
-          {previewPlay.defenders.map(renderDefenderMarker)}
-          {previewPlay.players.map(renderPlayerMarker)}
+          {previewPlay.defenders.map((defender) => renderDefenderMarker(defender, compact))}
+          {previewPlay.players.map((player) => renderPlayerMarker(player, compact))}
         </G>
       </Svg>
     </View>
@@ -342,5 +357,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 20,
+  },
+  containerCompact: {
+    borderRadius: 6,
+    marginBottom: 0,
   },
 });

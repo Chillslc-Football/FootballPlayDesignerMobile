@@ -32,6 +32,7 @@ type PlayListRow = {
   formation_name: string | null;
   front_name: string | null;
   categories: string[] | null;
+  data: unknown;
 };
 
 type PlayDetailRow = PlayListRow & {
@@ -49,12 +50,29 @@ function readString(value: unknown): string {
 }
 
 function rowToSummary(row: PlayListRow): PlaySummary {
+  const playType = fromDbPlayType(row.play_type);
+  const stored =
+    row.data && typeof row.data === 'object' ? (row.data as PlayData) : {};
+  const schemeLabel =
+    playType === 'defensive'
+      ? readString(row.front_name) || readString(stored.frontName) || 'Unknown front'
+      : readString(row.formation_name) || readString(stored.formationName) || 'Unknown formation';
+  const diagramPlay = preparePlayForRender({
+    id: row.id,
+    name: row.name,
+    play_type: row.play_type,
+    formation_name: row.formation_name,
+    front_name: row.front_name,
+    data: row.data,
+  });
+
   return {
     id: row.id,
     name: row.name,
-    playType: fromDbPlayType(row.play_type),
-    formationName: readString(row.formation_name) || 'Unknown formation',
+    playType,
+    formationName: schemeLabel,
     categories: normalizeCategories(row.categories),
+    diagramPlay,
   };
 }
 
@@ -120,7 +138,7 @@ function resolveScheme(row: PlayDetailRow, stored: PlayData, playType: PlayType)
 export async function fetchPlaysByTeam(teamId: string): Promise<PlaySummary[]> {
   const { data, error } = await supabase
     .from('plays')
-    .select('id, name, play_type, formation_name, front_name, categories')
+    .select('id, name, play_type, formation_name, front_name, categories, data')
     .eq('team_id', teamId)
     .order('name', { ascending: true });
 

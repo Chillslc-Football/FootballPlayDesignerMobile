@@ -1,3 +1,4 @@
+import { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { colors } from '../theme';
@@ -9,6 +10,7 @@ type PlaybookListProps = {
     label: string;
     subtitle?: string;
     icon?: string;
+    leading?: ReactNode;
     onPress: () => void;
   }>;
 };
@@ -22,6 +24,7 @@ export function PlaybookList({ items }: PlaybookListProps) {
           label={item.label}
           subtitle={item.subtitle}
           icon={item.icon}
+          leading={item.leading}
           onPress={item.onPress}
           isLast={index === items.length - 1}
         />

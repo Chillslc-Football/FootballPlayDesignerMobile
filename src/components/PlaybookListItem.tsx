@@ -1,3 +1,4 @@
+import { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '../theme';
@@ -6,6 +7,7 @@ type PlaybookListItemProps = {
   label: string;
   subtitle?: string;
   icon?: string;
+  leading?: ReactNode;
   onPress: () => void;
   isLast?: boolean;
 };
@@ -14,6 +16,7 @@ export function PlaybookListItem({
   label,
   subtitle,
   icon,
+  leading,
   onPress,
   isLast = false,
 }: PlaybookListItemProps) {
@@ -26,7 +29,8 @@ export function PlaybookListItem({
       ]}
       onPress={onPress}
     >
-      {icon ? (
+      {leading ? <View style={styles.leadingContainer}>{leading}</View> : null}
+      {!leading && icon ? (
         <View style={styles.iconContainer}>
           <Text style={styles.icon}>{icon}</Text>
         </View>
@@ -57,6 +61,9 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 32,
     alignItems: 'center',
+    marginRight: 12,
+  },
+  leadingContainer: {
     marginRight: 12,
   },
   icon: {

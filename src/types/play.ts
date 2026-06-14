@@ -8,6 +8,7 @@ export type PlaySummary = {
   playType: PlayType;
   formationName: string;
   categories: string[];
+  diagramPlay: RenderPlay | null;
 };
 
 export type PlayAssignment = {

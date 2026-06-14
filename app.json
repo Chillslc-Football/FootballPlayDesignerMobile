@@ -21,10 +21,16 @@
         "backgroundColor": "#0A1F14"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.chillslc.FootballPlayDesignerMobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0e13dabd-3514-45b8-a854-5736180ab2df"
+      }
     }
   }
 }

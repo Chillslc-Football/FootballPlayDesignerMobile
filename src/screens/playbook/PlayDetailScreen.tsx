@@ -7,11 +7,12 @@ import { PlaybookStackParamList } from '../../navigation/PlaybookStack';
 import { usePlaybook } from '../../playbook/PlaybookProvider';
 import type { PlayDetail } from '../../types/play';
 import { colors } from '../../theme';
+import { formatCategories, formatPlayType } from '../../utils/playDisplay';
 
 type Props = NativeStackScreenProps<PlaybookStackParamList, 'PlayDetail'>;
 
 export function PlayDetailScreen({ route }: Props) {
-  const { playId, categoryName } = route.params;
+  const { playId } = route.params;
   const { loadPlayDetail } = usePlaybook();
   const [play, setPlay] = useState<PlayDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,16 +70,20 @@ export function PlayDetailScreen({ route }: Props) {
     );
   }
 
-  const displayCategory = play.categories.includes(categoryName)
-    ? categoryName
-    : play.categories.join(', ') || categoryName;
+  const schemeTitle = play.schemeKind === 'front' ? 'Front' : 'Formation';
 
   return (
     <PlaybookContent>
-      <Text style={styles.metaLabel}>Category</Text>
-      <Text style={styles.metaValue}>{displayCategory}</Text>
-      <Text style={styles.metaLabel}>Formation</Text>
-      <Text style={styles.metaValue}>{play.formationName}</Text>
+      <View style={styles.metaSection}>
+        <Text style={styles.metaLabel}>Play Type</Text>
+        <Text style={styles.metaValue}>{formatPlayType(play.playType)}</Text>
+
+        <Text style={styles.metaLabel}>Categories</Text>
+        <Text style={styles.metaValue}>{formatCategories(play.categories)}</Text>
+
+        <Text style={styles.metaLabel}>{schemeTitle}</Text>
+        <Text style={styles.metaValue}>{play.schemeLabel}</Text>
+      </View>
 
       <View style={styles.imagePlaceholder}>
         <Text style={styles.imagePlaceholderIcon}>🏟️</Text>
@@ -88,21 +93,24 @@ export function PlayDetailScreen({ route }: Props) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Notes</Text>
         <Text style={styles.sectionBody}>
-          {play.notes.trim().length > 0 ? play.notes : 'No notes yet.'}
+          {play.notes.length > 0 ? play.notes : 'No notes yet.'}
         </Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Assignments</Text>
+        <Text style={styles.sectionTitle}>Player Assignments</Text>
         {play.assignments.length === 0 ? (
-          <Text style={styles.sectionBody}>No assignments yet.</Text>
+          <Text style={styles.sectionBody}>No player assignments yet.</Text>
         ) : (
           play.assignments.map((assignment, index) => (
             <View
               key={`${assignment.position}-${index}`}
               style={[styles.assignmentRow, index > 0 && styles.assignmentRowBorder]}
             >
-              <Text style={styles.assignmentPosition}>{assignment.position}</Text>
+              <Text style={styles.assignmentPosition}>{assignment.displayLabel}</Text>
+              {assignment.displayLabel !== assignment.position ? (
+                <Text style={styles.assignmentSlot}>Slot: {assignment.position}</Text>
+              ) : null}
               <Text style={styles.assignmentText}>{assignment.assignment}</Text>
             </View>
           ))
@@ -117,6 +125,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 48,
+  },
+  metaSection: {
+    marginBottom: 4,
   },
   metaLabel: {
     fontSize: 13,
@@ -182,6 +193,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: colors.accent,
+    marginBottom: 4,
+  },
+  assignmentSlot: {
+    fontSize: 12,
+    color: colors.textMuted,
     marginBottom: 4,
   },
   assignmentText: {

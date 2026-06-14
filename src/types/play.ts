@@ -10,10 +10,17 @@ export type PlaySummary = {
 
 export type PlayAssignment = {
   position: string;
+  displayLabel: string;
   assignment: string;
 };
 
-export type PlayDetail = PlaySummary & {
+export type PlayDetail = {
+  id: string;
+  name: string;
+  playType: PlayType;
+  schemeLabel: string;
+  schemeKind: 'formation' | 'front';
+  categories: string[];
   notes: string;
   assignments: PlayAssignment[];
 };

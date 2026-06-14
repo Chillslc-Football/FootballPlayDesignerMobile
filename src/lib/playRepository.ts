@@ -8,21 +8,32 @@ import {
   UNCategorized_CATEGORY,
 } from '../types/play';
 import { normalizeCategories } from '../utils/categoryUtils';
+import { resolvePlayerDisplayLabel } from '../utils/playDisplay';
+
+type StoredPlayer = {
+  id: string;
+  label?: string | null;
+};
+
+type PlayData = {
+  notes?: unknown;
+  playerNotes?: Record<string, unknown>;
+  formationName?: unknown;
+  frontName?: unknown;
+  players?: StoredPlayer[];
+};
 
 type PlayListRow = {
   id: string;
   name: string;
   play_type: 'offense' | 'defense';
   formation_name: string | null;
+  front_name: string | null;
   categories: string[] | null;
 };
 
 type PlayDetailRow = PlayListRow & {
-  data: {
-    notes?: string;
-    playerNotes?: Record<string, string>;
-    formationName?: string;
-  } | null;
+  data: PlayData | null;
 };
 
 const ASSIGNMENT_ORDER = ['QB', 'RB', 'FB', 'X', 'Y', 'Z', 'LT', 'LG', 'C', 'RG', 'RT'];
@@ -31,28 +42,21 @@ function fromDbPlayType(value: string): PlayType {
   return value === 'defense' ? 'defensive' : 'offensive';
 }
 
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 function rowToSummary(row: PlayListRow): PlaySummary {
   return {
     id: row.id,
     name: row.name,
     playType: fromDbPlayType(row.play_type),
-    formationName: row.formation_name?.trim() || 'Unknown formation',
+    formationName: readString(row.formation_name) || 'Unknown formation',
     categories: normalizeCategories(row.categories),
   };
 }
 
-function extractAssignments(playerNotes: Record<string, string> | undefined): PlayAssignment[] {
-  if (!playerNotes) {
-    return [];
-  }
-
-  const assignments = Object.entries(playerNotes)
-    .filter(([, assignment]) => assignment.trim().length > 0)
-    .map(([position, assignment]) => ({
-      position,
-      assignment: assignment.trim(),
-    }));
-
+function sortAssignments(assignments: PlayAssignment[]): PlayAssignment[] {
   return assignments.sort((left, right) => {
     const leftIndex = ASSIGNMENT_ORDER.indexOf(left.position);
     const rightIndex = ASSIGNMENT_ORDER.indexOf(right.position);
@@ -73,10 +77,48 @@ function extractAssignments(playerNotes: Record<string, string> | undefined): Pl
   });
 }
 
+function extractAssignments(
+  playerNotes: Record<string, unknown> | undefined,
+  players: StoredPlayer[] | undefined,
+): PlayAssignment[] {
+  if (!playerNotes) {
+    return [];
+  }
+
+  const playerLabelBySlot = new Map<string, string | null | undefined>(
+    (players ?? []).map((player) => [player.id, player.label]),
+  );
+
+  const assignments = Object.entries(playerNotes)
+    .filter(([, assignment]) => readString(assignment).length > 0)
+    .map(([position, assignment]) => ({
+      position,
+      displayLabel: resolvePlayerDisplayLabel(position, playerLabelBySlot.get(position)),
+      assignment: readString(assignment),
+    }));
+
+  return sortAssignments(assignments);
+}
+
+function resolveScheme(row: PlayDetailRow, stored: PlayData, playType: PlayType) {
+  if (playType === 'defensive') {
+    return {
+      schemeLabel: readString(row.front_name) || readString(stored.frontName) || 'Unknown front',
+      schemeKind: 'front' as const,
+    };
+  }
+
+  return {
+    schemeLabel:
+      readString(row.formation_name) || readString(stored.formationName) || 'Unknown formation',
+    schemeKind: 'formation' as const,
+  };
+}
+
 export async function fetchPlaysByTeam(teamId: string): Promise<PlaySummary[]> {
   const { data, error } = await supabase
     .from('plays')
-    .select('id, name, play_type, formation_name, categories')
+    .select('id, name, play_type, formation_name, front_name, categories')
     .eq('team_id', teamId)
     .order('name', { ascending: true });
 
@@ -90,7 +132,7 @@ export async function fetchPlaysByTeam(teamId: string): Promise<PlaySummary[]> {
 export async function fetchPlayById(teamId: string, playId: string): Promise<PlayDetail | null> {
   const { data, error } = await supabase
     .from('plays')
-    .select('id, name, play_type, formation_name, categories, data')
+    .select('id, name, play_type, formation_name, front_name, categories, data')
     .eq('team_id', teamId)
     .eq('id', playId)
     .maybeSingle();
@@ -106,12 +148,17 @@ export async function fetchPlayById(teamId: string, playId: string): Promise<Pla
   const row = data as PlayDetailRow;
   const summary = rowToSummary(row);
   const stored = row.data ?? {};
+  const scheme = resolveScheme(row, stored, summary.playType);
 
   return {
-    ...summary,
-    formationName: summary.formationName || stored.formationName?.trim() || 'Unknown formation',
-    notes: stored.notes?.trim() ?? '',
-    assignments: extractAssignments(stored.playerNotes),
+    id: summary.id,
+    name: summary.name,
+    playType: summary.playType,
+    schemeLabel: scheme.schemeLabel,
+    schemeKind: scheme.schemeKind,
+    categories: summary.categories,
+    notes: readString(stored.notes),
+    assignments: extractAssignments(stored.playerNotes, stored.players),
   };
 }
 

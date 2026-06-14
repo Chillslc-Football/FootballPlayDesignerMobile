@@ -1,0 +1,149 @@
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
+import { fetchUserTeamMemberships, updateLastTeamId } from '../lib/teamRepository';
+import type { Team, TeamMembership, TeamRole } from '../types/team';
+import { useAuth } from '../auth/AuthProvider';
+
+type TeamContextValue = {
+  memberships: TeamMembership[];
+  selectedTeam: Team | null;
+  selectedTeamMemberRole: TeamRole | null;
+  loading: boolean;
+  error: string | null;
+  selectTeam: (teamId: string) => Promise<void>;
+  switchTeam: () => void;
+  refreshTeams: () => Promise<void>;
+};
+
+const TeamContext = createContext<TeamContextValue | undefined>(undefined);
+
+type TeamProviderProps = {
+  children: ReactNode;
+};
+
+export function TeamProvider({ children }: TeamProviderProps) {
+  const { user } = useAuth();
+  const [memberships, setMemberships] = useState<TeamMembership[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [selectedTeamMemberRole, setSelectedTeamMemberRole] = useState<TeamRole | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refreshTeams = useCallback(async () => {
+    if (!user) {
+      setMemberships([]);
+      setSelectedTeam(null);
+      setSelectedTeamMemberRole(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { memberships: loadedMemberships, lastTeamId } = await fetchUserTeamMemberships(
+        user.id,
+      );
+
+      setMemberships(loadedMemberships);
+
+      const activeMembership = lastTeamId
+        ? loadedMemberships.find((membership) => membership.team.id === lastTeamId)
+        : undefined;
+
+      if (activeMembership) {
+        setSelectedTeam(activeMembership.team);
+        setSelectedTeamMemberRole(activeMembership.role);
+      } else {
+        setSelectedTeam(null);
+        setSelectedTeamMemberRole(null);
+      }
+    } catch (loadError) {
+      const message =
+        loadError instanceof Error ? loadError.message : 'Failed to load teams.';
+      setError(message);
+      setMemberships([]);
+      setSelectedTeam(null);
+      setSelectedTeamMemberRole(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void refreshTeams();
+  }, [refreshTeams]);
+
+  const selectTeam = useCallback(
+    async (teamId: string) => {
+      const membership = memberships.find((item) => item.team.id === teamId);
+
+      if (!membership || !user) {
+        return;
+      }
+
+      setSelectedTeam(membership.team);
+      setSelectedTeamMemberRole(membership.role);
+
+      try {
+        await updateLastTeamId(user.id, teamId);
+      } catch (updateError) {
+        const message =
+          updateError instanceof Error ? updateError.message : 'Failed to save team selection.';
+        setError(message);
+      }
+    },
+    [memberships, user],
+  );
+
+  const switchTeam = useCallback(() => {
+    setSelectedTeam(null);
+    setSelectedTeamMemberRole(null);
+    setError(null);
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      memberships,
+      selectedTeam,
+      selectedTeamMemberRole,
+      loading,
+      error,
+      selectTeam,
+      switchTeam,
+      refreshTeams,
+    }),
+    [
+      memberships,
+      selectedTeam,
+      selectedTeamMemberRole,
+      loading,
+      error,
+      selectTeam,
+      switchTeam,
+      refreshTeams,
+    ],
+  );
+
+  return <TeamContext.Provider value={value}>{children}</TeamContext.Provider>;
+}
+
+export function useTeam() {
+  const context = useContext(TeamContext);
+
+  if (!context) {
+    throw new Error('useTeam must be used within a TeamProvider');
+  }
+
+  return context;
+}

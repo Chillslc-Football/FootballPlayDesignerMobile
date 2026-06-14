@@ -6,7 +6,31 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/auth/AuthProvider';
 import { TabNavigator } from './src/navigation/TabNavigator';
 import { LoginScreen } from './src/screens/LoginScreen';
+import { TeamSelectorScreen } from './src/screens/TeamSelectorScreen';
+import { TeamProvider, useTeam } from './src/team/TeamProvider';
 import { colors } from './src/theme';
+
+function AuthenticatedApp() {
+  const { selectedTeam, loading } = useTeam();
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </View>
+    );
+  }
+
+  if (!selectedTeam) {
+    return <TeamSelectorScreen />;
+  }
+
+  return (
+    <NavigationContainer>
+      <TabNavigator />
+    </NavigationContainer>
+  );
+}
 
 function AppContent() {
   const { session, loading } = useAuth();
@@ -24,9 +48,9 @@ function AppContent() {
   }
 
   return (
-    <NavigationContainer>
-      <TabNavigator />
-    </NavigationContainer>
+    <TeamProvider>
+      <AuthenticatedApp />
+    </TeamProvider>
   );
 }
 

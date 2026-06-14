@@ -4,24 +4,18 @@ import {
   PlayDetailScreen,
   PlaybookCategoriesScreen,
   PlaybookPlaysScreen,
-  PlaybookSubcategoriesScreen,
 } from '../screens/playbook';
 import { colors } from '../theme';
 
 export type PlaybookStackParamList = {
   Categories: undefined;
-  Subcategories: {
-    categoryId: string;
-    categoryName: string;
-  };
   Plays: {
-    categoryId: string;
-    subcategoryId: string;
-    subcategoryName: string;
+    categoryName: string;
   };
   PlayDetail: {
     playId: string;
     playName: string;
+    categoryName: string;
   };
 };
 
@@ -50,14 +44,9 @@ export function PlaybookStack() {
         options={{ headerShown: false }}
       />
       <Stack.Screen
-        name="Subcategories"
-        component={PlaybookSubcategoriesScreen}
-        options={({ route }) => ({ title: route.params.categoryName })}
-      />
-      <Stack.Screen
         name="Plays"
         component={PlaybookPlaysScreen}
-        options={({ route }) => ({ title: route.params.subcategoryName })}
+        options={({ route }) => ({ title: route.params.categoryName })}
       />
       <Stack.Screen
         name="PlayDetail"

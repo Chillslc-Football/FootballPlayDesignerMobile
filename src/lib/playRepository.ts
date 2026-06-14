@@ -10,6 +10,7 @@ import {
 } from '../types/play';
 import { normalizeCategories } from '../utils/categoryUtils';
 import { resolvePlayerDisplayLabel } from '../utils/playDisplay';
+import { buildEditablePlayerNotes } from '../utils/playerNotes';
 
 type StoredPlayer = {
   id: string;
@@ -168,6 +169,9 @@ export async function fetchPlayById(teamId: string, playId: string): Promise<Pla
     categories: summary.categories,
     notes: readString(stored.notes),
     assignments: extractAssignments(stored.playerNotes, stored.players),
+    playerNotes: buildEditablePlayerNotes(
+      stored.playerNotes as Record<string, unknown> | undefined,
+    ),
     diagramPlay,
   };
 }
@@ -200,4 +204,75 @@ export function filterPlaysByCategory(plays: PlaySummary[], categoryName: string
   }
 
   return plays.filter((play) => play.categories.includes(categoryName));
+}
+
+async function fetchPlayDataJson(
+  teamId: string,
+  playId: string,
+): Promise<Record<string, unknown>> {
+  const { data, error } = await supabase
+    .from('plays')
+    .select('data')
+    .eq('team_id', teamId)
+    .eq('id', playId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data?.data || typeof data.data !== 'object') {
+    return {};
+  }
+
+  return data.data as Record<string, unknown>;
+}
+
+async function updatePlayDataJson(
+  teamId: string,
+  playId: string,
+  nextData: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await supabase
+    .from('plays')
+    .update({ data: nextData })
+    .eq('team_id', teamId)
+    .eq('id', playId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function updatePlayNotes(
+  teamId: string,
+  playId: string,
+  notes: string,
+): Promise<void> {
+  const currentData = await fetchPlayDataJson(teamId, playId);
+
+  await updatePlayDataJson(teamId, playId, {
+    ...currentData,
+    notes,
+  });
+}
+
+export async function updatePlayPlayerNotes(
+  teamId: string,
+  playId: string,
+  playerNotes: Record<string, string>,
+): Promise<void> {
+  const currentData = await fetchPlayDataJson(teamId, playId);
+  const existingPlayerNotes =
+    currentData.playerNotes && typeof currentData.playerNotes === 'object'
+      ? (currentData.playerNotes as Record<string, unknown>)
+      : undefined;
+
+  await updatePlayDataJson(teamId, playId, {
+    ...currentData,
+    playerNotes: {
+      ...existingPlayerNotes,
+      ...playerNotes,
+    },
+  });
 }

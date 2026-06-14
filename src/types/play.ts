@@ -25,6 +25,7 @@ export type PlayDetail = {
   categories: string[];
   notes: string;
   assignments: PlayAssignment[];
+  playerNotes: Record<string, string>;
   diagramPlay: RenderPlay | null;
 };
 

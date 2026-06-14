@@ -1,57 +1,89 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { EditAssignmentsModal } from '../../components/EditAssignmentsModal';
+import { EditNotesModal } from '../../components/EditNotesModal';
 import { PlaybookContent } from '../../components/PlaybookContent';
 import { ReadOnlyPlayDiagram } from '../../playDiagram/ReadOnlyPlayDiagram';
 import { PlaybookStackParamList } from '../../navigation/PlaybookStack';
 import { usePlaybook } from '../../playbook/PlaybookProvider';
+import { useTeam } from '../../team/TeamProvider';
 import type { PlayDetail } from '../../types/play';
 import { colors } from '../../theme';
+import { canEditPlayMetadata } from '../../utils/canEditPlayMetadata';
 import { formatCategories, formatPlayType } from '../../utils/playDisplay';
 
 type Props = NativeStackScreenProps<PlaybookStackParamList, 'PlayDetail'>;
 
 export function PlayDetailScreen({ route }: Props) {
   const { playId } = route.params;
-  const { loadPlayDetail } = usePlaybook();
+  const { selectedTeamMemberRole } = useTeam();
+  const { loadPlayDetail, savePlayNotes, savePlayAssignments } = usePlaybook();
   const [play, setPlay] = useState<PlayDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notesModalVisible, setNotesModalVisible] = useState(false);
+  const [assignmentsModalVisible, setAssignmentsModalVisible] = useState(false);
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [savingAssignments, setSavingAssignments] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const canEdit = canEditPlayMetadata(selectedTeamMemberRole);
+
+  const reloadPlay = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const loadedPlay = await loadPlayDetail(playId);
+      setPlay(loadedPlay);
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : 'Failed to load play.';
+      setError(message);
+      setPlay(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadPlayDetail, playId]);
 
   useEffect(() => {
-    let cancelled = false;
+    void reloadPlay();
+  }, [reloadPlay]);
 
-    const load = async () => {
-      setLoading(true);
-      setError(null);
+  const handleSaveNotes = async (notes: string) => {
+    setSavingNotes(true);
+    setSaveError(null);
 
-      try {
-        const loadedPlay = await loadPlayDetail(playId);
+    const result = await savePlayNotes(playId, notes);
 
-        if (!cancelled) {
-          setPlay(loadedPlay);
-        }
-      } catch (loadError) {
-        if (!cancelled) {
-          const message =
-            loadError instanceof Error ? loadError.message : 'Failed to load play.';
-          setError(message);
-          setPlay(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
+    if (result.error) {
+      setSaveError(result.error);
+      setSavingNotes(false);
+      return;
+    }
 
-    void load();
+    setNotesModalVisible(false);
+    setSavingNotes(false);
+    await reloadPlay();
+  };
 
-    return () => {
-      cancelled = true;
-    };
-  }, [loadPlayDetail, playId]);
+  const handleSaveAssignments = async (playerNotes: Record<string, string>) => {
+    setSavingAssignments(true);
+    setSaveError(null);
+
+    const result = await savePlayAssignments(playId, playerNotes);
+
+    if (result.error) {
+      setSaveError(result.error);
+      setSavingAssignments(false);
+      return;
+    }
+
+    setAssignmentsModalVisible(false);
+    setSavingAssignments(false);
+    await reloadPlay();
+  };
 
   if (loading) {
     return (
@@ -95,14 +127,40 @@ export function PlayDetailScreen({ route }: Props) {
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Notes</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Notes</Text>
+          {canEdit ? (
+            <Pressable
+              style={({ pressed }) => [styles.editButton, pressed && styles.editButtonPressed]}
+              onPress={() => {
+                setSaveError(null);
+                setNotesModalVisible(true);
+              }}
+            >
+              <Text style={styles.editButtonText}>Edit Notes</Text>
+            </Pressable>
+          ) : null}
+        </View>
         <Text style={styles.sectionBody}>
           {play.notes.length > 0 ? play.notes : 'No notes yet.'}
         </Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Player Assignments</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Player Assignments</Text>
+          {canEdit ? (
+            <Pressable
+              style={({ pressed }) => [styles.editButton, pressed && styles.editButtonPressed]}
+              onPress={() => {
+                setSaveError(null);
+                setAssignmentsModalVisible(true);
+              }}
+            >
+              <Text style={styles.editButtonText}>Edit Assignments</Text>
+            </Pressable>
+          ) : null}
+        </View>
         {play.assignments.length === 0 ? (
           <Text style={styles.sectionBody}>No player assignments yet.</Text>
         ) : (
@@ -120,6 +178,35 @@ export function PlayDetailScreen({ route }: Props) {
           ))
         )}
       </View>
+
+      <EditNotesModal
+        visible={notesModalVisible}
+        initialNotes={play.notes}
+        saving={savingNotes}
+        error={saveError}
+        onCancel={() => {
+          if (!savingNotes) {
+            setSaveError(null);
+            setNotesModalVisible(false);
+          }
+        }}
+        onSave={handleSaveNotes}
+      />
+
+      <EditAssignmentsModal
+        visible={assignmentsModalVisible}
+        assignments={play.assignments}
+        storedPlayerNotes={play.playerNotes}
+        saving={savingAssignments}
+        error={saveError}
+        onCancel={() => {
+          if (!savingAssignments) {
+            setSaveError(null);
+            setAssignmentsModalVisible(false);
+          }
+        }}
+        onSave={handleSaveAssignments}
+      />
     </PlaybookContent>
   );
 }
@@ -170,18 +257,41 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    gap: 12,
+  },
   sectionTitle: {
+    flex: 1,
     fontSize: 14,
     fontWeight: '600',
     color: colors.gold,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    marginBottom: 12,
   },
   sectionBody: {
     fontSize: 15,
     lineHeight: 22,
     color: colors.textSecondary,
+  },
+  editButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  editButtonPressed: {
+    opacity: 0.85,
+  },
+  editButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.accent,
   },
   assignmentRow: {
     paddingTop: 12,

@@ -13,6 +13,8 @@ import {
   fetchPlaysByTeam,
   filterPlaysByCategory,
   getCategoriesFromPlays,
+  updatePlayNotes,
+  updatePlayPlayerNotes,
 } from '../lib/playRepository';
 import type { PlayCategoryGroup, PlayDetail, PlaySummary } from '../types/play';
 import { useTeam } from '../team/TeamProvider';
@@ -25,6 +27,11 @@ type PlaybookContextValue = {
   refreshPlays: () => Promise<void>;
   getPlaysForCategory: (categoryName: string) => PlaySummary[];
   loadPlayDetail: (playId: string) => Promise<PlayDetail | null>;
+  savePlayNotes: (playId: string, notes: string) => Promise<{ error: string | null }>;
+  savePlayAssignments: (
+    playId: string,
+    playerNotes: Record<string, string>,
+  ) => Promise<{ error: string | null }>;
 };
 
 const PlaybookContext = createContext<PlaybookContextValue | undefined>(undefined);
@@ -85,6 +92,42 @@ export function PlaybookProvider({ children }: PlaybookProviderProps) {
     [selectedTeam],
   );
 
+  const savePlayNotes = useCallback(
+    async (playId: string, notes: string) => {
+      if (!selectedTeam) {
+        return { error: 'No team selected.' };
+      }
+
+      try {
+        await updatePlayNotes(selectedTeam.id, playId, notes);
+        return { error: null };
+      } catch (saveError) {
+        const message =
+          saveError instanceof Error ? saveError.message : 'Failed to save notes.';
+        return { error: message };
+      }
+    },
+    [selectedTeam],
+  );
+
+  const savePlayAssignments = useCallback(
+    async (playId: string, playerNotes: Record<string, string>) => {
+      if (!selectedTeam) {
+        return { error: 'No team selected.' };
+      }
+
+      try {
+        await updatePlayPlayerNotes(selectedTeam.id, playId, playerNotes);
+        return { error: null };
+      } catch (saveError) {
+        const message =
+          saveError instanceof Error ? saveError.message : 'Failed to save assignments.';
+        return { error: message };
+      }
+    },
+    [selectedTeam],
+  );
+
   const value = useMemo(
     () => ({
       plays,
@@ -94,8 +137,20 @@ export function PlaybookProvider({ children }: PlaybookProviderProps) {
       refreshPlays,
       getPlaysForCategory,
       loadPlayDetail,
+      savePlayNotes,
+      savePlayAssignments,
     }),
-    [plays, categories, loading, error, refreshPlays, getPlaysForCategory, loadPlayDetail],
+    [
+      plays,
+      categories,
+      loading,
+      error,
+      refreshPlays,
+      getPlaysForCategory,
+      loadPlayDetail,
+      savePlayNotes,
+      savePlayAssignments,
+    ],
   );
 
   return <PlaybookContext.Provider value={value}>{children}</PlaybookContext.Provider>;

@@ -1,0 +1,18 @@
+export const fieldTheme = {
+  viewBoxBackground: '#0A1F14',
+  turf: '#2D6A4F',
+  turfStripeLight: '#40916C',
+  turfStripeDark: '#1B4332',
+  line: '#B7E4C7',
+  losLine: '#95D5B2',
+  routeStroke: '#FFFFFF',
+  blockStroke: '#D4AF37',
+  motionStroke: '#B7E4C7',
+  offenseFill: '#FFFFFF',
+  offenseStroke: '#0A1F14',
+  offenseText: '#0A1F14',
+  defenseFill: '#14352A',
+  defenseStroke: '#95D5B2',
+  defenseText: '#FFFFFF',
+  labelText: '#B7E4C7',
+};

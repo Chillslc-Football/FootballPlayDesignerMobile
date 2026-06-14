@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { PlaybookContent } from '../../components/PlaybookContent';
+import { ReadOnlyPlayDiagram } from '../../playDiagram/ReadOnlyPlayDiagram';
 import { PlaybookStackParamList } from '../../navigation/PlaybookStack';
 import { usePlaybook } from '../../playbook/PlaybookProvider';
 import type { PlayDetail } from '../../types/play';
@@ -85,10 +86,13 @@ export function PlayDetailScreen({ route }: Props) {
         <Text style={styles.metaValue}>{play.schemeLabel}</Text>
       </View>
 
-      <View style={styles.imagePlaceholder}>
-        <Text style={styles.imagePlaceholderIcon}>🏟️</Text>
-        <Text style={styles.imagePlaceholderText}>Play diagram coming soon</Text>
-      </View>
+      {play.diagramPlay ? (
+        <ReadOnlyPlayDiagram play={play.diagramPlay} />
+      ) : (
+        <View style={styles.diagramUnavailable}>
+          <Text style={styles.diagramUnavailableText}>Diagram unavailable for this play.</Text>
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Notes</Text>
@@ -142,8 +146,8 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: 16,
   },
-  imagePlaceholder: {
-    height: 220,
+  diagramUnavailable: {
+    height: 120,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.cardBorder,
@@ -152,13 +156,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 20,
   },
-  imagePlaceholderIcon: {
-    fontSize: 40,
-    marginBottom: 8,
-  },
-  imagePlaceholderText: {
+  diagramUnavailableText: {
     fontSize: 14,
     color: colors.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: 16,
   },
   section: {
     backgroundColor: colors.card,

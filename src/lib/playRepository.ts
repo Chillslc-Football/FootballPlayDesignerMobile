@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { preparePlayForRender } from '../playDiagram/utils/preparePlayForRender';
 import {
   PlayAssignment,
   PlayCategoryGroup,
@@ -149,6 +150,14 @@ export async function fetchPlayById(teamId: string, playId: string): Promise<Pla
   const summary = rowToSummary(row);
   const stored = row.data ?? {};
   const scheme = resolveScheme(row, stored, summary.playType);
+  const diagramPlay = preparePlayForRender({
+    id: row.id,
+    name: row.name,
+    play_type: row.play_type,
+    formation_name: row.formation_name,
+    front_name: row.front_name,
+    data: row.data,
+  });
 
   return {
     id: summary.id,
@@ -159,6 +168,7 @@ export async function fetchPlayById(teamId: string, playId: string): Promise<Pla
     categories: summary.categories,
     notes: readString(stored.notes),
     assignments: extractAssignments(stored.playerNotes, stored.players),
+    diagramPlay,
   };
 }
 

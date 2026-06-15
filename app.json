@@ -22,8 +22,18 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.chillslc.FootballPlayDesignerMobile"
+      "package": "com.chillslc.FootballPlayDesignerMobile",
+      "googleServicesFile": "./google-services.json"
     },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#0A1F14",
+          "defaultChannel": "default"
+        }
+      ]
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     },

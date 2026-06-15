@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { ScreenContainer } from '../components/ScreenContainer';
-import { fetchTeamUpdatesByTeam } from '../lib/teamUpdateRepository';
+import {
+  fetchTeamUpdatesByTeam,
+  subscribeTeamUpdatesByTeam,
+} from '../lib/teamUpdateRepository';
 import { useTeam } from '../team/TeamProvider';
 import { colors } from '../theme';
 import type { TeamUpdate } from '../types/teamUpdate';
@@ -13,34 +17,74 @@ export function TeamUpdatesScreen() {
   const [updates, setUpdates] = useState<TeamUpdate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadedTeamIdRef = useRef<string | null>(null);
+  const selectedTeamIdRef = useRef<string | null>(null);
 
-  const loadUpdates = useCallback(async () => {
-    if (!selectedTeam) {
-      setUpdates([]);
+  selectedTeamIdRef.current = selectedTeam?.id ?? null;
+
+  const loadUpdates = useCallback(async (teamId: string, options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+
+    if (!silent) {
+      setLoading(true);
       setError(null);
-      setLoading(false);
-      return;
     }
 
-    setLoading(true);
-    setError(null);
-
     try {
-      const loadedUpdates = await fetchTeamUpdatesByTeam(selectedTeam.id);
+      const loadedUpdates = await fetchTeamUpdatesByTeam(teamId);
+
+      if (selectedTeamIdRef.current !== teamId) {
+        return;
+      }
+
       setUpdates(loadedUpdates);
+      setError(null);
+      loadedTeamIdRef.current = teamId;
     } catch (loadError) {
+      if (selectedTeamIdRef.current !== teamId) {
+        return;
+      }
+
       const message =
         loadError instanceof Error ? loadError.message : 'Failed to load team updates.';
       setError(message);
-      setUpdates([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedTeam]);
 
-  useEffect(() => {
-    void loadUpdates();
-  }, [loadUpdates]);
+      if (!silent) {
+        setUpdates([]);
+      }
+    } finally {
+      if (!silent && selectedTeamIdRef.current === teamId) {
+        setLoading(false);
+      }
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const teamId = selectedTeamIdRef.current;
+
+      if (!teamId) {
+        setUpdates([]);
+        setError(null);
+        setLoading(false);
+        loadedTeamIdRef.current = null;
+        return;
+      }
+
+      const isFirstLoadForTeam = loadedTeamIdRef.current !== teamId;
+      void loadUpdates(teamId, { silent: !isFirstLoadForTeam });
+
+      const unsubscribe = subscribeTeamUpdatesByTeam(teamId, () => {
+        if (selectedTeamIdRef.current !== teamId) {
+          return;
+        }
+
+        void loadUpdates(teamId, { silent: true });
+      });
+
+      return unsubscribe;
+    }, [selectedTeam?.id, loadUpdates]),
+  );
 
   if (loading) {
     return (

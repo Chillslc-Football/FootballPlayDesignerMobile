@@ -44,3 +44,28 @@ export async function fetchTeamUpdatesByTeam(teamId: string): Promise<TeamUpdate
 
   return ((data ?? []) as TeamUpdateRow[]).map(rowToUpdate);
 }
+
+export function subscribeTeamUpdatesByTeam(
+  teamId: string,
+  onChange: () => void,
+): () => void {
+  const channel = supabase
+    .channel(`team-updates:${teamId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'team_updates',
+        filter: `team_id=eq.${teamId}`,
+      },
+      () => {
+        onChange();
+      },
+    )
+    .subscribe();
+
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}

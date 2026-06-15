@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "702831687906",
+    "project_id": "football-play-designer",
+    "storage_bucket": "football-play-designer.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:702831687906:android:6bbbe3ddbe04d8cb9b86bb",
+        "android_client_info": {
+          "package_name": "com.chillslc.FootballPlayDesignerMobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBjJ5M3Ynd7QgAGfmiHLDtolG0G1Wlw-tE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

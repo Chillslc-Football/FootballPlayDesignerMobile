@@ -4,9 +4,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
   CalendarScreen,
   HomeScreen,
-  MessagesScreen,
   MoreScreen,
   PlaybookScreen,
+  TeamUpdatesScreen,
 } from '../screens';
 import { colors } from '../theme';
 
@@ -14,7 +14,7 @@ export type RootTabParamList = {
   Home: undefined;
   Playbook: undefined;
   Calendar: undefined;
-  Messages: undefined;
+  Updates: undefined;
   More: undefined;
 };
 
@@ -24,7 +24,7 @@ const tabIcons: Record<keyof RootTabParamList, string> = {
   Home: '🏠',
   Playbook: '📖',
   Calendar: '📅',
-  Messages: '💬',
+  Updates: '📢',
   More: '☰',
 };
 
@@ -57,7 +57,7 @@ export function TabNavigator() {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Playbook" component={PlaybookScreen} />
       <Tab.Screen name="Calendar" component={CalendarScreen} />
-      <Tab.Screen name="Messages" component={MessagesScreen} />
+      <Tab.Screen name="Updates" component={TeamUpdatesScreen} options={{ title: 'Updates' }} />
       <Tab.Screen name="More" component={MoreScreen} />
     </Tab.Navigator>
   );

@@ -43,3 +43,5 @@ google-services.json
 # generated native folders
 /ios
 /android
+
+football-play-designer-firebase-adminsdk-*.json

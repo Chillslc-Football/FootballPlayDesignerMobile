@@ -4,10 +4,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
   CalendarScreen,
   HomeScreen,
-  MoreScreen,
   PlaybookScreen,
   TeamUpdatesScreen,
 } from '../screens';
+import { MoreStack } from './MoreStack';
 import { colors } from '../theme';
 
 export type RootTabParamList = {
@@ -58,7 +58,7 @@ export function TabNavigator() {
       <Tab.Screen name="Playbook" component={PlaybookScreen} />
       <Tab.Screen name="Calendar" component={CalendarScreen} />
       <Tab.Screen name="Updates" component={TeamUpdatesScreen} options={{ title: 'Updates' }} />
-      <Tab.Screen name="More" component={MoreScreen} />
+      <Tab.Screen name="More" component={MoreStack} />
     </Tab.Navigator>
   );
 }

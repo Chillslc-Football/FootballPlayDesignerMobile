@@ -4,11 +4,13 @@ import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from './src/auth/AuthProvider';
+import { PushNotificationProvider } from './src/notifications/PushNotificationProvider';
 import { TabNavigator } from './src/navigation/TabNavigator';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { TeamSelectorScreen } from './src/screens/TeamSelectorScreen';
 import { TeamProvider, useTeam } from './src/team/TeamProvider';
 import { colors } from './src/theme';
+import { pushDebugLog } from './src/notifications/pushDebugLog';
 
 function AuthenticatedApp() {
   const { selectedTeam, loading } = useTeam();
@@ -33,9 +35,10 @@ function AuthenticatedApp() {
 }
 
 function AppContent() {
-  const { session, loading } = useAuth();
+  const { session, user, loading } = useAuth();
 
   if (loading) {
+    pushDebugLog('AppContent auth loading');
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.accent} />
@@ -44,12 +47,20 @@ function AppContent() {
   }
 
   if (!session) {
+    pushDebugLog('AppContent unauthenticated branch', { hasUser: Boolean(user) });
     return <LoginScreen />;
   }
 
+  pushDebugLog('AppContent authenticated branch', {
+    sessionUserId: session.user?.id ?? null,
+    contextUserId: user?.id ?? null,
+  });
+
   return (
     <TeamProvider>
-      <AuthenticatedApp />
+      <PushNotificationProvider>
+        <AuthenticatedApp />
+      </PushNotificationProvider>
     </TeamProvider>
   );
 }

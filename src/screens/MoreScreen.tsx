@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthProvider';
 import { MenuItem } from '../components/MenuItem';
 import { ScreenContainer } from '../components/ScreenContainer';
+import { MoreStackParamList } from '../navigation/MoreStack';
 import { useTeam } from '../team/TeamProvider';
 import { colors } from '../theme';
 import { formatTeamRole } from '../utils/roleLabels';
 
-export function MoreScreen() {
+type Props = NativeStackScreenProps<MoreStackParamList, 'MoreMenu'>;
+
+export function MoreScreen({ navigation }: Props) {
   const { signOut } = useAuth();
   const { selectedTeam, selectedTeamMemberRole, switchTeam } = useTeam();
   const [signingOut, setSigningOut] = useState(false);
@@ -38,6 +42,11 @@ export function MoreScreen() {
         <MenuItem label="Settings" icon="⚙️" />
         <MenuItem label="Help" icon="❓" />
         <MenuItem label="Switch Team" icon="🔁" onPress={switchTeam} />
+        <MenuItem
+          label="Push Debug"
+          icon="🛠️"
+          onPress={() => navigation.navigate('PushDebug')}
+        />
         <MenuItem
           label={signingOut ? 'Signing Out...' : 'Sign Out'}
           icon="🚪"

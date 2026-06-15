@@ -34,6 +34,9 @@ yarn-error.*
 .env
 .env*.local
 
+# Firebase (download from Firebase Console; do not commit)
+google-services.json
+
 # typescript
 *.tsbuildinfo
 

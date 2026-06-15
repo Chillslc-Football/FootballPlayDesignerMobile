@@ -10,6 +10,8 @@ import {
 import { Session, User } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
+import { clearRegisteredPushTokenFromServer } from '../notifications/pushNotificationSetup';
+import { pushDebugLog } from '../notifications/pushDebugLog';
 
 type AuthContextValue = {
   session: Session | null;
@@ -39,7 +41,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      pushDebugLog('Auth state changed', {
+        event,
+        hasSession: Boolean(nextSession),
+        userId: nextSession?.user?.id ?? null,
+      });
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
       setLoading(false);
@@ -64,6 +71,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const signOut = useCallback(async () => {
+    await clearRegisteredPushTokenFromServer();
     await supabase.auth.signOut();
   }, []);
 

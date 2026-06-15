@@ -23,7 +23,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.chillslc.FootballPlayDesignerMobile",
-      "googleServicesFile": "./firebase/google-services.json"
+      "googleServicesFile": "$GOOGLE_SERVICES_JSON"
     },
     "plugins": [
       [

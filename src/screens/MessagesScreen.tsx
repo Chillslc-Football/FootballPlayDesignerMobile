@@ -30,7 +30,7 @@ function senderLabel(message: TeamMessage, currentUserId: string | undefined): s
     return 'You';
   }
 
-  return 'Team member';
+  return message.sender_name ?? 'Team member';
 }
 
 export function MessagesScreen() {

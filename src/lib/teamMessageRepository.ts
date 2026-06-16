@@ -1,5 +1,7 @@
 import { supabase } from './supabase';
+import type { ProfileNameFields } from '../types/profile';
 import type { TeamMessage, TeamMessageThread } from '../types/teamMessage';
+import { resolveProfileDisplayName } from '../utils/profileDisplay';
 
 type TeamMessageThreadRow = {
   id: string;
@@ -22,8 +24,14 @@ type TeamMessageRow = {
   deleted_at: string | null;
 };
 
+type ProfileRow = ProfileNameFields & {
+  id: string;
+};
+
 const MESSAGE_COLUMNS =
   'id, thread_id, team_id, sender_id, body, created_at, edited_at, deleted_at';
+
+const PROFILE_NAME_COLUMNS = 'id, display_name, email';
 
 function rowToThread(row: TeamMessageThreadRow): TeamMessageThread {
   return {
@@ -37,17 +45,56 @@ function rowToThread(row: TeamMessageThreadRow): TeamMessageThread {
   };
 }
 
-function rowToMessage(row: TeamMessageRow): TeamMessage {
-  return {
+function collectUniqueSenderIds(rows: TeamMessageRow[]): string[] {
+  return [...new Set(rows.map((row) => row.sender_id))];
+}
+
+async function fetchSenderNamesByUserIds(
+  userIds: string[],
+): Promise<Map<string, string | null>> {
+  const nameByUserId = new Map<string, string | null>();
+
+  if (userIds.length === 0) {
+    return nameByUserId;
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(PROFILE_NAME_COLUMNS)
+    .in('id', userIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  for (const row of (data ?? []) as ProfileRow[]) {
+    nameByUserId.set(row.id, resolveProfileDisplayName(row));
+  }
+
+  return nameByUserId;
+}
+
+function rowsToMessages(
+  rows: TeamMessageRow[],
+  nameBySenderId: Map<string, string | null>,
+): TeamMessage[] {
+  return rows.map((row) => ({
     id: row.id,
     thread_id: row.thread_id,
     team_id: row.team_id,
     sender_id: row.sender_id,
+    sender_name: nameBySenderId.get(row.sender_id) ?? null,
     body: row.body,
     created_at: row.created_at,
     edited_at: row.edited_at,
     deleted_at: row.deleted_at,
-  };
+  }));
+}
+
+async function enrichMessagesWithSenderNames(rows: TeamMessageRow[]): Promise<TeamMessage[]> {
+  const senderIds = collectUniqueSenderIds(rows);
+  const nameBySenderId = await fetchSenderNamesByUserIds(senderIds);
+  return rowsToMessages(rows, nameBySenderId);
 }
 
 export async function getOrCreateTeamChatThread(teamId: string): Promise<TeamMessageThread> {
@@ -81,7 +128,7 @@ export async function fetchTeamMessagesByThread(
     throw new Error(error.message);
   }
 
-  return ((data ?? []) as TeamMessageRow[]).map(rowToMessage);
+  return enrichMessagesWithSenderNames((data ?? []) as TeamMessageRow[]);
 }
 
 export async function sendTeamMessage(
@@ -111,7 +158,8 @@ export async function sendTeamMessage(
     throw new Error(error.message);
   }
 
-  return rowToMessage(data as TeamMessageRow);
+  const [message] = await enrichMessagesWithSenderNames([data as TeamMessageRow]);
+  return message;
 }
 
 export function subscribeTeamMessagesByThread(

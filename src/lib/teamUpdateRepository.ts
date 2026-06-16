@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { createSafeRealtimeUnsubscribe } from './realtimeChannelCleanup';
 import {
   DEFAULT_TEAM_UPDATE_TYPE,
   type CreateTeamUpdateInput,
@@ -141,12 +142,19 @@ export async function setShowOnHome(updateId: string, showOnHome: boolean): Prom
   }
 }
 
+export type TeamUpdatesSubscriptionOptions = {
+  channelName?: string;
+};
+
 export function subscribeTeamUpdatesByTeam(
   teamId: string,
   onChange: () => void,
+  options?: TeamUpdatesSubscriptionOptions,
 ): () => void {
+  const channelName = options?.channelName ?? `team-updates:${teamId}`;
+
   const channel = supabase
-    .channel(`team-updates:${teamId}`)
+    .channel(channelName)
     .on(
       'postgres_changes',
       {
@@ -161,7 +169,5 @@ export function subscribeTeamUpdatesByTeam(
     )
     .subscribe();
 
-  return () => {
-    void supabase.removeChannel(channel);
-  };
+  return createSafeRealtimeUnsubscribe(channel);
 }

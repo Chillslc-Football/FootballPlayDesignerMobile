@@ -87,7 +87,7 @@ export function TeamUpdatesScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const teamId = selectedTeamIdRef.current;
+      const teamId = selectedTeam?.id;
 
       if (!teamId) {
         setUpdates([]);
@@ -100,20 +100,24 @@ export function TeamUpdatesScreen() {
       const isFirstLoadForTeam = loadedTeamIdRef.current !== teamId;
       void loadUpdates(teamId, { silent: !isFirstLoadForTeam });
 
-      const unsubscribe = subscribeTeamUpdatesByTeam(teamId, () => {
-        if (selectedTeamIdRef.current !== teamId) {
-          return;
-        }
+      const unsubscribe = subscribeTeamUpdatesByTeam(
+        teamId,
+        () => {
+          if (selectedTeamIdRef.current !== teamId) {
+            return;
+          }
 
-        void loadUpdates(teamId, { silent: true });
-      });
+          void loadUpdates(teamId, { silent: true });
+        },
+        { channelName: `team-updates-screen:${teamId}` },
+      );
 
       return unsubscribe;
     }, [selectedTeam?.id, loadUpdates]),
   );
 
   const handleCreateUpdate = async () => {
-    const teamId = selectedTeamIdRef.current;
+    const teamId = selectedTeam?.id;
 
     if (!teamId || !user) {
       return;

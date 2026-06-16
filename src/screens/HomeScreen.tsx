@@ -52,7 +52,7 @@ export function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const teamId = selectedTeamIdRef.current;
+      const teamId = selectedTeam?.id;
 
       if (!teamId) {
         setFeaturedUpdate(null);
@@ -63,13 +63,17 @@ export function HomeScreen() {
       setLoadingFeatured(true);
       void loadFeaturedUpdate(teamId);
 
-      const unsubscribe = subscribeTeamUpdatesByTeam(teamId, () => {
-        if (selectedTeamIdRef.current !== teamId) {
-          return;
-        }
+      const unsubscribe = subscribeTeamUpdatesByTeam(
+        teamId,
+        () => {
+          if (selectedTeamIdRef.current !== teamId) {
+            return;
+          }
 
-        void loadFeaturedUpdate(teamId);
-      });
+          void loadFeaturedUpdate(teamId);
+        },
+        { channelName: `team-updates-home:${teamId}` },
+      );
 
       return unsubscribe;
     }, [selectedTeam?.id, loadFeaturedUpdate]),

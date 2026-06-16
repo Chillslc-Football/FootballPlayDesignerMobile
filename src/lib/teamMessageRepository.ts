@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { createSafeRealtimeUnsubscribe } from './realtimeChannelCleanup';
 import type { ProfileNameFields } from '../types/profile';
 import type { TeamMessage, TeamMessageThread } from '../types/teamMessage';
 import { resolveProfileDisplayName } from '../utils/profileDisplay';
@@ -162,13 +163,20 @@ export async function sendTeamMessage(
   return message;
 }
 
+export type TeamMessagesSubscriptionOptions = {
+  channelName?: string;
+};
+
 export function subscribeTeamMessagesByThread(
   teamId: string,
   threadId: string,
   onChange: () => void,
+  options?: TeamMessagesSubscriptionOptions,
 ): () => void {
+  const channelName = options?.channelName ?? `team-messages:${teamId}:${threadId}`;
+
   const channel = supabase
-    .channel(`team-messages:${teamId}:${threadId}`)
+    .channel(channelName)
     .on(
       'postgres_changes',
       {
@@ -183,7 +191,5 @@ export function subscribeTeamMessagesByThread(
     )
     .subscribe();
 
-  return () => {
-    void supabase.removeChannel(channel);
-  };
+  return createSafeRealtimeUnsubscribe(channel);
 }

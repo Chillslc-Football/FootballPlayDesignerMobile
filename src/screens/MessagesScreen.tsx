@@ -108,7 +108,7 @@ export function MessagesScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const teamId = selectedTeamIdRef.current;
+      const teamId = selectedTeam?.id;
 
       if (!teamId) {
         setThread(null);
@@ -137,13 +137,18 @@ export function MessagesScreen() {
           return;
         }
 
-        unsubscribe = subscribeTeamMessagesByThread(teamId, threadId, () => {
-          if (selectedTeamIdRef.current !== teamId) {
-            return;
-          }
+        unsubscribe = subscribeTeamMessagesByThread(
+          teamId,
+          threadId,
+          () => {
+            if (selectedTeamIdRef.current !== teamId) {
+              return;
+            }
 
-          void loadChat(teamId, { silent: true });
-        });
+            void loadChat(teamId, { silent: true });
+          },
+          { channelName: `team-messages-screen:${teamId}:${threadId}` },
+        );
       };
 
       void initialize();
@@ -156,7 +161,7 @@ export function MessagesScreen() {
   );
 
   const handleSend = async () => {
-    const teamId = selectedTeamIdRef.current;
+    const teamId = selectedTeam?.id;
     const activeThreadId = threadIdRef.current;
 
     if (!teamId || !activeThreadId || !user) {

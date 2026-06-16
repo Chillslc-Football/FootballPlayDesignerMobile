@@ -9,7 +9,17 @@ export type TeamUpdate = {
   body: string;
   update_type: TeamUpdateType;
   is_pinned: boolean;
+  show_on_home: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type CreateTeamUpdateInput = {
+  teamId: string;
+  title: string;
+  body: string;
+  update_type: TeamUpdateType;
+  is_pinned: boolean;
+  createdBy: string;
 };

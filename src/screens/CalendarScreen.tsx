@@ -1,10 +1,5 @@
-import { ScreenContainer } from '../components/ScreenContainer';
-import { PlaceholderText } from '../components/PlaceholderText';
+import { CalendarStack } from '../navigation/CalendarStack';
 
 export function CalendarScreen() {
-  return (
-    <ScreenContainer title="Calendar" scrollable={false}>
-      <PlaceholderText message="Calendar functionality coming soon" />
-    </ScreenContainer>
-  );
+  return <CalendarStack />;
 }

@@ -5,6 +5,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from './src/auth/AuthProvider';
 import { PushNotificationProvider } from './src/notifications/PushNotificationProvider';
+import { TeamMessageNotificationHandler } from './src/notifications/TeamMessageNotificationHandler';
+import { notifyTeamMessageNavigationReady } from './src/notifications/teamMessageNotificationNavigation';
+import { navigationRef } from './src/navigation/navigationRef';
 import { TabNavigator } from './src/navigation/TabNavigator';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { TeamSelectorScreen } from './src/screens/TeamSelectorScreen';
@@ -28,7 +31,12 @@ function AuthenticatedApp() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer
+      ref={navigationRef}
+      onReady={() => {
+        notifyTeamMessageNavigationReady();
+      }}
+    >
       <TabNavigator />
     </NavigationContainer>
   );
@@ -59,6 +67,7 @@ function AppContent() {
   return (
     <TeamProvider>
       <PushNotificationProvider>
+        <TeamMessageNotificationHandler />
         <AuthenticatedApp />
       </PushNotificationProvider>
     </TeamProvider>

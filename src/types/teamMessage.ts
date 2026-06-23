@@ -1,3 +1,5 @@
+export type TeamMessageMentionAudience = 'everyone' | 'coaches' | 'players' | 'parents';
+
 export type TeamMessageThreadKind =
   | 'everyone'
   | 'coaches'
@@ -38,6 +40,7 @@ export type TeamMessage = {
   sender_id: string;
   sender_name: string | null;
   body: string;
+  mention_audiences: TeamMessageMentionAudience[];
   created_at: string;
   edited_at: string | null;
   deleted_at: string | null;

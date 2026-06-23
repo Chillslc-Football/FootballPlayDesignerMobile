@@ -5,6 +5,7 @@ import type {
   DirectMessageEligibleMember,
   DirectMessageThreadWithUnread,
   TeamMessage,
+  TeamMessageMentionAudience,
   TeamMessageThread,
   TeamMessageThreadKind,
   TeamMessageThreadWithUnread,
@@ -43,6 +44,7 @@ type TeamMessageRow = {
   team_id: string;
   sender_id: string;
   body: string;
+  mention_audiences?: TeamMessageMentionAudience[] | null;
   created_at: string;
   edited_at: string | null;
   deleted_at: string | null;
@@ -53,7 +55,7 @@ type ProfileRow = ProfileNameFields & {
 };
 
 const MESSAGE_COLUMNS =
-  'id, thread_id, team_id, sender_id, body, created_at, edited_at, deleted_at';
+  'id, thread_id, team_id, sender_id, body, mention_audiences, created_at, edited_at, deleted_at';
 
 const PROFILE_NAME_COLUMNS = 'id, display_name, email';
 
@@ -140,6 +142,7 @@ function rowsToMessages(
     sender_id: row.sender_id,
     sender_name: nameBySenderId.get(row.sender_id) ?? null,
     body: row.body,
+    mention_audiences: row.mention_audiences ?? [],
     created_at: row.created_at,
     edited_at: row.edited_at,
     deleted_at: row.deleted_at,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -16,6 +16,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { TeamMessageBody } from '../../components/TeamMessageBody';
 import { useAuth } from '../../auth/AuthProvider';
 import {
   fetchTeamMessagesByThread,
@@ -29,6 +30,13 @@ import { useTeamMessageUnread } from '../../team/TeamMessageUnreadProvider';
 import { colors } from '../../theme';
 import type { TeamMessage } from '../../types/teamMessage';
 import { formatTeamUpdateDate } from '../../utils/teamUpdateDisplay';
+import {
+  filterAudienceMentionSuggestions,
+  getActiveMentionQuery,
+  insertMentionToken,
+  type AudienceMentionOption,
+} from '../../utils/teamMessageMentionAutocomplete';
+import { AudienceMentionMenu } from './AudienceMentionMenu';
 
 type Props = NativeStackScreenProps<MessagesStackParamList, 'ChatThread'>;
 
@@ -49,6 +57,9 @@ export function ChatThreadScreen({ route }: Props) {
   const { refreshUnreadCount } = useTeamMessageUnread();
   const [messages, setMessages] = useState<TeamMessage[]>([]);
   const [draft, setDraft] = useState('');
+  const [composeCursorPosition, setComposeCursorPosition] = useState(0);
+  const [composeSelection, setComposeSelection] = useState({ start: 0, end: 0 });
+  const [mentionMenuForceHidden, setMentionMenuForceHidden] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,9 +68,25 @@ export function ChatThreadScreen({ route }: Props) {
   const threadIdRef = useRef(threadId);
   const lastMarkedReadMessageIdRef = useRef<string | null>(null);
   const listRef = useRef<FlatList<TeamMessage> | null>(null);
+  const composeInputRef = useRef<TextInput | null>(null);
 
   selectedTeamIdRef.current = selectedTeam?.id ?? null;
   threadIdRef.current = threadId;
+
+  const activeMentionQuery = useMemo(
+    () => getActiveMentionQuery(draft, composeCursorPosition),
+    [composeCursorPosition, draft],
+  );
+
+  const mentionSuggestions = useMemo(() => {
+    if (!activeMentionQuery || mentionMenuForceHidden) {
+      return [];
+    }
+
+    return filterAudienceMentionSuggestions(activeMentionQuery.query);
+  }, [activeMentionQuery, mentionMenuForceHidden]);
+
+  const showMentionMenu = mentionSuggestions.length > 0 && activeMentionQuery !== null;
 
   const scrollToLatestMessage = useCallback(() => {
     if (messages.length === 0) {
@@ -196,6 +223,44 @@ export function ChatThreadScreen({ route }: Props) {
     void markMessagesReadThroughLatest();
   }, [loading, messages, markMessagesReadThroughLatest]);
 
+  const handleDraftChange = useCallback((nextDraft: string) => {
+    setDraft(nextDraft);
+    setMentionMenuForceHidden(false);
+  }, []);
+
+  const handleComposeSelectionChange = useCallback(
+    (start: number, end: number) => {
+      setComposeCursorPosition(end);
+      setComposeSelection({ start, end });
+    },
+    [],
+  );
+
+  const applyMentionSelection = useCallback(
+    (option: AudienceMentionOption) => {
+      if (!activeMentionQuery) {
+        return;
+      }
+
+      const { nextBody, nextCursor } = insertMentionToken(
+        draft,
+        activeMentionQuery.startIndex,
+        activeMentionQuery.endIndex,
+        option.token,
+      );
+
+      setDraft(nextBody);
+      setComposeCursorPosition(nextCursor);
+      setComposeSelection({ start: nextCursor, end: nextCursor });
+      setMentionMenuForceHidden(false);
+
+      requestAnimationFrame(() => {
+        composeInputRef.current?.focus();
+      });
+    },
+    [activeMentionQuery, draft],
+  );
+
   const handleSend = async () => {
     const teamId = selectedTeam?.id;
     const activeThreadId = threadIdRef.current;
@@ -215,6 +280,9 @@ export function ChatThreadScreen({ route }: Props) {
     try {
       await sendTeamMessage(teamId, activeThreadId, user.id, draft);
       setDraft('');
+      setComposeCursorPosition(0);
+      setComposeSelection({ start: 0, end: 0 });
+      setMentionMenuForceHidden(false);
       await loadChat(teamId, activeThreadId, { silent: true });
       scrollToLatestMessage();
     } catch (sendError) {
@@ -275,7 +343,7 @@ export function ChatThreadScreen({ route }: Props) {
                 <Text style={styles.messageMeta}>
                   {senderLabel(message, user?.id)} · {formatTeamUpdateDate(message.created_at)}
                 </Text>
-                <Text style={styles.messageBody}>{message.body}</Text>
+                <TeamMessageBody body={message.body} />
               </View>
             )}
           />
@@ -283,16 +351,30 @@ export function ChatThreadScreen({ route }: Props) {
 
         <SafeAreaView edges={['bottom']} style={styles.composerSafeArea}>
           <View style={styles.composer}>
-            <TextInput
-              style={styles.input}
-              value={draft}
-              onChangeText={setDraft}
-              placeholder="Write a message..."
-              placeholderTextColor={colors.textMuted}
-              multiline
-              editable={!sending && !loading && Boolean(selectedTeam)}
-              textAlignVertical="top"
-            />
+            <View style={styles.composeField}>
+              {showMentionMenu ? (
+                <AudienceMentionMenu
+                  options={mentionSuggestions}
+                  onSelect={applyMentionSelection}
+                />
+              ) : null}
+              <TextInput
+                ref={composeInputRef}
+                style={styles.input}
+                value={draft}
+                onChangeText={handleDraftChange}
+                onSelectionChange={(event) => {
+                  const { start, end } = event.nativeEvent.selection;
+                  handleComposeSelectionChange(start, end);
+                }}
+                selection={composeSelection}
+                placeholder="Write a message..."
+                placeholderTextColor={colors.textMuted}
+                multiline
+                editable={!sending && !loading && Boolean(selectedTeam)}
+                textAlignVertical="top"
+              />
+            </View>
             <Pressable
               style={({ pressed }) => [
                 styles.sendButton,
@@ -377,11 +459,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginBottom: 8,
   },
-  messageBody: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.textSecondary,
-  },
   composerSafeArea: {
     backgroundColor: colors.background,
   },
@@ -391,6 +468,9 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingTop: 12,
     paddingBottom: 8,
+  },
+  composeField: {
+    flex: 1,
   },
   input: {
     flex: 1,

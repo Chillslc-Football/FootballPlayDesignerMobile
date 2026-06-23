@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -9,9 +10,12 @@ import {
 } from 'react-native';
 
 import { listDmEligibleMembers } from '../../lib/teamMessageRepository';
+import { supabase } from '../../lib/supabase';
 import { colors } from '../../theme';
 import type { DirectMessageEligibleMember } from '../../types/teamMessage';
+import type { ProfileNameFields } from '../../types/profile';
 import type { TeamRole } from '../../types/team';
+import { resolveProfileDisplayName } from '../../utils/profileDisplay';
 import { formatTeamRole } from '../../utils/roleLabels';
 
 type NewMessagePickerProps = {
@@ -20,18 +24,71 @@ type NewMessagePickerProps = {
   onClose: () => void;
 };
 
-function memberLabel(member: DirectMessageEligibleMember): string {
-  const name = member.display_name?.trim();
+type EnrichedMember = DirectMessageEligibleMember & {
+  email: string | null;
+};
 
-  if (name) {
-    return name;
+type ProfileRow = ProfileNameFields & {
+  id: string;
+};
+
+function memberLabel(member: EnrichedMember): string {
+  return resolveProfileDisplayName(member) ?? 'Team member';
+}
+
+function memberMatchesQuery(member: EnrichedMember, normalizedQuery: string): boolean {
+  const label = memberLabel(member).toLowerCase();
+  const displayName = member.display_name?.trim().toLowerCase() ?? '';
+  const email = member.email?.trim().toLowerCase() ?? '';
+  const role = formatTeamRole(member.role as TeamRole).toLowerCase();
+
+  return (
+    label.includes(normalizedQuery) ||
+    displayName.includes(normalizedQuery) ||
+    email.includes(normalizedQuery) ||
+    role.includes(normalizedQuery)
+  );
+}
+
+async function enrichMembersWithProfiles(
+  members: DirectMessageEligibleMember[],
+): Promise<EnrichedMember[]> {
+  if (members.length === 0) {
+    return [];
   }
 
-  return 'Team member';
+  const userIds = members.map((member) => member.user_id);
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name, email')
+    .in('id', userIds);
+
+  if (error) {
+    return members.map((member) => ({
+      ...member,
+      email: null,
+    }));
+  }
+
+  const profileByUserId = new Map<string, ProfileRow>();
+  for (const row of (data ?? []) as ProfileRow[]) {
+    profileByUserId.set(row.id, row);
+  }
+
+  return members.map((member) => {
+    const profile = profileByUserId.get(member.user_id);
+
+    return {
+      user_id: member.user_id,
+      role: member.role,
+      display_name: profile?.display_name ?? member.display_name,
+      email: profile?.email ?? null,
+    };
+  });
 }
 
 export function NewMessagePicker({ teamId, onSelectMember, onClose }: NewMessagePickerProps) {
-  const [members, setMembers] = useState<DirectMessageEligibleMember[]>([]);
+  const [members, setMembers] = useState<EnrichedMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -50,7 +107,13 @@ export function NewMessagePicker({ teamId, onSelectMember, onClose }: NewMessage
         return;
       }
 
-      setMembers(loadedMembers);
+      const enrichedMembers = await enrichMembersWithProfiles(loadedMembers);
+
+      if (selectedTeamIdRef.current !== activeTeamId) {
+        return;
+      }
+
+      setMembers(enrichedMembers);
     } catch (loadError) {
       if (selectedTeamIdRef.current !== activeTeamId) {
         return;
@@ -78,12 +141,7 @@ export function NewMessagePicker({ teamId, onSelectMember, onClose }: NewMessage
       return members;
     }
 
-    return members.filter((member) => {
-      const name = memberLabel(member).toLowerCase();
-      const role = formatTeamRole(member.role as TeamRole).toLowerCase();
-
-      return name.includes(normalizedQuery) || role.includes(normalizedQuery);
-    });
+    return members.filter((member) => memberMatchesQuery(member, normalizedQuery));
   }, [members, query]);
 
   return (
@@ -118,7 +176,12 @@ export function NewMessagePicker({ teamId, onSelectMember, onClose }: NewMessage
       ) : filteredMembers.length === 0 ? (
         <Text style={styles.statusText}>No team members found.</Text>
       ) : (
-        <View style={styles.memberList}>
+        <ScrollView
+          style={styles.memberList}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}
+        >
           {filteredMembers.map((member) => (
             <Pressable
               key={member.user_id}
@@ -129,7 +192,7 @@ export function NewMessagePicker({ teamId, onSelectMember, onClose }: NewMessage
               <Text style={styles.memberRole}>{formatTeamRole(member.role as TeamRole)}</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
       )}
     </View>
   );

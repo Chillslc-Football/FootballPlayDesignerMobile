@@ -20,6 +20,7 @@ import { TeamMessageBody } from '../../components/TeamMessageBody';
 import { useAuth } from '../../auth/AuthProvider';
 import {
   fetchTeamMessagesByThread,
+  listDmEligibleMembers,
   markThreadRead,
   sendTeamMessage,
   subscribeTeamMessagesByThread,
@@ -28,15 +29,17 @@ import { MessagesStackParamList } from '../../navigation/MessagesStack';
 import { useTeam } from '../../team/TeamProvider';
 import { useTeamMessageUnread } from '../../team/TeamMessageUnreadProvider';
 import { colors } from '../../theme';
-import type { TeamMessage } from '../../types/teamMessage';
+import type { DirectMessageEligibleMember, PickedUserMention, TeamMessage } from '../../types/teamMessage';
 import { formatTeamUpdateDate } from '../../utils/teamUpdateDisplay';
+import { encodeMessageBodyForStorage } from '../../utils/teamMessageMentionUtils';
 import {
-  filterAudienceMentionSuggestions,
+  buildPickedUserMention,
+  filterMentionSuggestions,
   getActiveMentionQuery,
   insertMentionToken,
-  type AudienceMentionOption,
+  type MentionSuggestion,
 } from '../../utils/teamMessageMentionAutocomplete';
-import { AudienceMentionMenu } from './AudienceMentionMenu';
+import { MentionMenu } from './MentionMenu';
 
 type Props = NativeStackScreenProps<MessagesStackParamList, 'ChatThread'>;
 
@@ -57,6 +60,8 @@ export function ChatThreadScreen({ route }: Props) {
   const { refreshUnreadCount } = useTeamMessageUnread();
   const [messages, setMessages] = useState<TeamMessage[]>([]);
   const [draft, setDraft] = useState('');
+  const [pickedUserMentions, setPickedUserMentions] = useState<PickedUserMention[]>([]);
+  const [mentionMembers, setMentionMembers] = useState<DirectMessageEligibleMember[]>([]);
   const [composeCursorPosition, setComposeCursorPosition] = useState(0);
   const [composeSelection, setComposeSelection] = useState({ start: 0, end: 0 });
   const [mentionMenuForceHidden, setMentionMenuForceHidden] = useState(false);
@@ -83,8 +88,8 @@ export function ChatThreadScreen({ route }: Props) {
       return [];
     }
 
-    return filterAudienceMentionSuggestions(activeMentionQuery.query);
-  }, [activeMentionQuery, mentionMenuForceHidden]);
+    return filterMentionSuggestions(activeMentionQuery.query, mentionMembers);
+  }, [activeMentionQuery, mentionMembers, mentionMenuForceHidden]);
 
   const showMentionMenu = mentionSuggestions.length > 0 && activeMentionQuery !== null;
 
@@ -223,6 +228,35 @@ export function ChatThreadScreen({ route }: Props) {
     void markMessagesReadThroughLatest();
   }, [loading, messages, markMessagesReadThroughLatest]);
 
+  useEffect(() => {
+    const teamId = selectedTeam?.id;
+
+    if (!teamId) {
+      setMentionMembers([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const members = await listDmEligibleMembers(teamId);
+
+        if (!cancelled && selectedTeamIdRef.current === teamId) {
+          setMentionMembers(members);
+        }
+      } catch {
+        if (!cancelled && selectedTeamIdRef.current === teamId) {
+          setMentionMembers([]);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTeam?.id]);
+
   const handleDraftChange = useCallback((nextDraft: string) => {
     setDraft(nextDraft);
     setMentionMenuForceHidden(false);
@@ -237,7 +271,7 @@ export function ChatThreadScreen({ route }: Props) {
   );
 
   const applyMentionSelection = useCallback(
-    (option: AudienceMentionOption) => {
+    (option: MentionSuggestion) => {
       if (!activeMentionQuery) {
         return;
       }
@@ -250,6 +284,9 @@ export function ChatThreadScreen({ route }: Props) {
       );
 
       setDraft(nextBody);
+      if (option.kind === 'member') {
+        setPickedUserMentions((current) => [...current, buildPickedUserMention(option)]);
+      }
       setComposeCursorPosition(nextCursor);
       setComposeSelection({ start: nextCursor, end: nextCursor });
       setMentionMenuForceHidden(false);
@@ -278,8 +315,10 @@ export function ChatThreadScreen({ route }: Props) {
     setError(null);
 
     try {
-      await sendTeamMessage(teamId, activeThreadId, user.id, draft);
+      const bodyForStorage = encodeMessageBodyForStorage(draft, pickedUserMentions);
+      await sendTeamMessage(teamId, activeThreadId, user.id, bodyForStorage);
       setDraft('');
+      setPickedUserMentions([]);
       setComposeCursorPosition(0);
       setComposeSelection({ start: 0, end: 0 });
       setMentionMenuForceHidden(false);
@@ -353,10 +392,7 @@ export function ChatThreadScreen({ route }: Props) {
           <View style={styles.composer}>
             <View style={styles.composeField}>
               {showMentionMenu ? (
-                <AudienceMentionMenu
-                  options={mentionSuggestions}
-                  onSelect={applyMentionSelection}
-                />
+                <MentionMenu options={mentionSuggestions} onSelect={applyMentionSelection} />
               ) : null}
               <TextInput
                 ref={composeInputRef}

@@ -8,6 +8,30 @@ export const USER_MENTION_BODY_PATTERN =
 export const AUDIENCE_MENTION_BODY_PATTERN =
   /(^|[^\w])@(everyone|coaches|players|parents)(?!\w)/gi;
 
+export function buildUserMentionToken(displayName: string, userId: string): string {
+  const label = displayName.trim() || 'Team member';
+  return `@[${label}](mention:${userId})`;
+}
+
+export function encodeMessageBodyForStorage(
+  body: string,
+  pickedUserMentions: Array<{ userId: string; displayName: string; insertText: string }>,
+): string {
+  let result = body;
+
+  for (const mention of pickedUserMentions) {
+    const index = result.indexOf(mention.insertText);
+    if (index === -1) {
+      continue;
+    }
+
+    const canonical = buildUserMentionToken(mention.displayName, mention.userId);
+    result = `${result.slice(0, index)}${canonical}${result.slice(index + mention.insertText.length)}`;
+  }
+
+  return result;
+}
+
 type MentionSpan = {
   start: number;
   end: number;

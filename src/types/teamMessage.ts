@@ -33,6 +33,21 @@ export type DirectMessageEligibleMember = {
   display_name: string | null;
 };
 
+export type PickedUserMention = {
+  userId: string;
+  displayName: string;
+  insertText: string;
+};
+
+export type TeamMessageDraft = {
+  body: string;
+  pickedUserMentions: PickedUserMention[];
+};
+
+export function createEmptyTeamMessageDraft(): TeamMessageDraft {
+  return { body: '', pickedUserMentions: [] };
+}
+
 export type TeamMessage = {
   id: string;
   thread_id: string;

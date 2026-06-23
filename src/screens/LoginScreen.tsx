@@ -2,8 +2,8 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -41,60 +41,63 @@ export function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={styles.header}>
-          <Text style={styles.title}>Football Play Designer</Text>
-          <Text style={styles.subtitle}>Sign in to your team account</Text>
-        </View>
+      <KeyboardAvoidingView style={styles.container} behavior="padding">
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <Text style={styles.title}>Football Play Designer</Text>
+            <Text style={styles.subtitle}>Sign in to your team account</Text>
+          </View>
 
-        <View style={styles.form}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            textContentType="emailAddress"
-            placeholder="coach@example.com"
-            placeholderTextColor={colors.textMuted}
-            editable={!submitting}
-          />
+          <View style={styles.form}>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              placeholder="coach@example.com"
+              placeholderTextColor={colors.textMuted}
+              editable={!submitting}
+            />
 
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            textContentType="password"
-            placeholder="Password"
-            placeholderTextColor={colors.textMuted}
-            editable={!submitting}
-          />
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              textContentType="password"
+              placeholder="Password"
+              placeholderTextColor={colors.textMuted}
+              editable={!submitting}
+            />
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+            {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.button,
-              (pressed || submitting) && styles.buttonPressed,
-              submitting && styles.buttonDisabled,
-            ]}
-            onPress={handleSignIn}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator color={colors.background} />
-            ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
-            )}
-          </Pressable>
-        </View>
+            <Pressable
+              style={({ pressed }) => [
+                styles.button,
+                (pressed || submitting) && styles.buttonPressed,
+                submitting && styles.buttonDisabled,
+              ]}
+              onPress={handleSignIn}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator color={colors.background} />
+              ) : (
+                <Text style={styles.buttonText}>Sign In</Text>
+              )}
+            </Pressable>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -108,7 +111,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
+    paddingVertical: 24,
   },
   header: {
     marginBottom: 32,

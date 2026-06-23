@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -29,6 +29,10 @@ import type {
   DirectMessageThreadWithUnread,
   TeamMessageThreadWithUnread,
 } from '../../types/teamMessage';
+import {
+  clearPendingTeamMessageNavigation,
+  peekPendingTeamMessageNavigation,
+} from '../../notifications/teamMessageNotificationNavigation';
 import { NewMessagePicker } from './NewMessagePicker';
 
 type NavigationProp = NativeStackNavigationProp<MessagesStackParamList, 'ConversationList'>;
@@ -84,6 +88,7 @@ export function ConversationListScreen() {
   const [error, setError] = useState<string | null>(null);
   const loadedTeamIdRef = useRef<string | null>(null);
   const selectedTeamIdRef = useRef<string | null>(null);
+  const appliedPendingThreadIdRef = useRef<string | null>(null);
 
   selectedTeamIdRef.current = selectedTeam?.id ?? null;
 
@@ -159,6 +164,44 @@ export function ConversationListScreen() {
       void refreshUnreadCount();
     }, [loadConversations, refreshUnreadCount, selectedTeam?.id]),
   );
+
+  useEffect(() => {
+    appliedPendingThreadIdRef.current = null;
+  }, [selectedTeam?.id]);
+
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+
+    const pending = peekPendingTeamMessageNavigation();
+
+    if (!pending?.threadId) {
+      return;
+    }
+
+    const teamId = selectedTeam?.id;
+
+    if (!teamId || pending.teamId !== teamId) {
+      return;
+    }
+
+    if (appliedPendingThreadIdRef.current === pending.threadId) {
+      return;
+    }
+
+    const allThreads = [...channels, ...directMessages];
+    const matchedThread = allThreads.find((thread) => thread.id === pending.threadId);
+
+    if (!matchedThread) {
+      clearPendingTeamMessageNavigation();
+      return;
+    }
+
+    appliedPendingThreadIdRef.current = pending.threadId;
+    openChatThread(matchedThread.id, getConversationTitle(matchedThread));
+    clearPendingTeamMessageNavigation();
+  }, [loading, channels, directMessages, openChatThread, selectedTeam?.id]);
 
   const handleSelectChannel = (channel: TeamMessageThreadWithUnread) => {
     openChatThread(channel.id, getConversationTitle(channel));

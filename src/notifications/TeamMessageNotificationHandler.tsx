@@ -27,11 +27,19 @@ export function TeamMessageNotificationHandler() {
   const processingRef = useRef(false);
 
   const navigateToMessages = useCallback((): boolean => {
+    const pending = peekPendingTeamMessageNavigation();
     const navigated = navigateToTab('Messages');
 
     if (navigated) {
       logTeamMessagePush('navigated to Messages tab');
-      clearPendingTeamMessageNavigation();
+
+      if (!pending?.threadId) {
+        clearPendingTeamMessageNavigation();
+      } else {
+        logTeamMessagePush('pending thread navigation retained for ConversationListScreen', {
+          threadId: pending.threadId,
+        });
+      }
     }
 
     return navigated;

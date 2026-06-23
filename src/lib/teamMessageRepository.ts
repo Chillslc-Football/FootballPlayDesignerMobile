@@ -1,17 +1,40 @@
 import { supabase } from './supabase';
 import { createSafeRealtimeUnsubscribe } from './realtimeChannelCleanup';
 import type { ProfileNameFields } from '../types/profile';
-import type { TeamMessage, TeamMessageThread } from '../types/teamMessage';
+import type {
+  DirectMessageEligibleMember,
+  DirectMessageThreadWithUnread,
+  TeamMessage,
+  TeamMessageThread,
+  TeamMessageThreadKind,
+  TeamMessageThreadWithUnread,
+} from '../types/teamMessage';
 import { resolveProfileDisplayName } from '../utils/profileDisplay';
 
 type TeamMessageThreadRow = {
   id: string;
   team_id: string;
   title: string;
+  thread_kind: TeamMessageThreadKind;
   created_by: string;
   created_at: string;
   updated_at: string;
   last_message_at: string | null;
+};
+
+type TeamMessageThreadWithUnreadRow = TeamMessageThreadRow & {
+  unread_count: number | string;
+};
+
+type DirectMessageThreadWithUnreadRow = TeamMessageThreadWithUnreadRow & {
+  other_user_id: string;
+  other_display_name: string | null;
+};
+
+type DirectMessageEligibleMemberRow = {
+  user_id: string;
+  role: string;
+  display_name: string | null;
 };
 
 type TeamMessageRow = {
@@ -34,15 +57,46 @@ const MESSAGE_COLUMNS =
 
 const PROFILE_NAME_COLUMNS = 'id, display_name, email';
 
+function parseUnreadCount(value: number | string | null | undefined): number {
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+}
+
 function rowToThread(row: TeamMessageThreadRow): TeamMessageThread {
   return {
     id: row.id,
     team_id: row.team_id,
     title: row.title,
+    thread_kind: row.thread_kind ?? 'everyone',
     created_by: row.created_by,
     created_at: row.created_at,
     updated_at: row.updated_at,
     last_message_at: row.last_message_at,
+  };
+}
+
+function rowToThreadWithUnread(row: TeamMessageThreadWithUnreadRow): TeamMessageThreadWithUnread {
+  return {
+    ...rowToThread(row),
+    unread_count: parseUnreadCount(row.unread_count),
+  };
+}
+
+function rowToDirectThreadWithUnread(
+  row: DirectMessageThreadWithUnreadRow,
+): DirectMessageThreadWithUnread {
+  return {
+    ...rowToThreadWithUnread(row),
+    other_user_id: row.other_user_id,
+    other_display_name: row.other_display_name,
   };
 }
 
@@ -98,6 +152,70 @@ async function enrichMessagesWithSenderNames(rows: TeamMessageRow[]): Promise<Te
   return rowsToMessages(rows, nameBySenderId);
 }
 
+export async function listAccessibleTeamMessageThreads(
+  teamId: string,
+): Promise<TeamMessageThreadWithUnread[]> {
+  const { data, error } = await supabase.rpc('list_accessible_team_message_threads', {
+    p_team_id: teamId,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as TeamMessageThreadWithUnreadRow[]).map(rowToThreadWithUnread);
+}
+
+export async function listDirectMessageThreads(
+  teamId: string,
+): Promise<DirectMessageThreadWithUnread[]> {
+  const { data, error } = await supabase.rpc('list_direct_message_threads', {
+    p_team_id: teamId,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as DirectMessageThreadWithUnreadRow[]).map(rowToDirectThreadWithUnread);
+}
+
+export async function listDmEligibleMembers(teamId: string): Promise<DirectMessageEligibleMember[]> {
+  const { data, error } = await supabase.rpc('list_dm_eligible_members', {
+    p_team_id: teamId,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as DirectMessageEligibleMemberRow[]).map((row) => ({
+    user_id: row.user_id,
+    role: row.role,
+    display_name: row.display_name,
+  }));
+}
+
+export async function getOrCreateDirectMessageThread(
+  teamId: string,
+  targetUserId: string,
+): Promise<TeamMessageThread> {
+  const { data, error } = await supabase.rpc('get_or_create_direct_message_thread', {
+    p_team_id: teamId,
+    p_target_user_id: targetUserId,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data || typeof data !== 'object') {
+    throw new Error('Failed to start direct message.');
+  }
+
+  return rowToThread(data as TeamMessageThreadRow);
+}
+
 export async function getOrCreateTeamChatThread(teamId: string): Promise<TeamMessageThread> {
   const { data, error } = await supabase.rpc('get_or_create_team_chat_thread', {
     p_team_id: teamId,
@@ -130,6 +248,38 @@ export async function fetchTeamMessagesByThread(
   }
 
   return enrichMessagesWithSenderNames((data ?? []) as TeamMessageRow[]);
+}
+
+export async function markThreadRead(threadId: string, upToMessageId: string): Promise<void> {
+  const { error } = await supabase.rpc('mark_thread_read', {
+    p_thread_id: threadId,
+    p_up_to_message_id: upToMessageId,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function getTeamMessageUnreadCount(teamId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('get_team_message_unread_count', {
+    p_team_id: teamId,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (typeof data === 'number') {
+    return data;
+  }
+
+  if (typeof data === 'string') {
+    const parsed = Number(data);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
 }
 
 export async function sendTeamMessage(

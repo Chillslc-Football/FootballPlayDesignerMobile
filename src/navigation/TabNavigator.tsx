@@ -10,6 +10,10 @@ import {
 } from '../screens';
 import { MoreStack } from './MoreStack';
 import { colors } from '../theme';
+import {
+  formatUnreadTabBadge,
+  useTeamMessageUnread,
+} from '../team/TeamMessageUnreadProvider';
 
 export type RootTabParamList = {
   Home: undefined;
@@ -40,6 +44,9 @@ function TabIcon({ label, color, focused }: { label: string; color: string; focu
 }
 
 export function TabNavigator() {
+  const { unreadCount } = useTeamMessageUnread();
+  const messagesTabBadge = formatUnreadTabBadge(unreadCount);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -61,7 +68,15 @@ export function TabNavigator() {
       <Tab.Screen name="Playbook" component={PlaybookScreen} />
       <Tab.Screen name="Calendar" component={CalendarScreen} />
       <Tab.Screen name="Updates" component={TeamUpdatesScreen} options={{ title: 'Updates' }} />
-      <Tab.Screen name="Messages" component={MessagesScreen} />
+      <Tab.Screen
+        name="Messages"
+        component={MessagesScreen}
+        options={{
+          tabBarHideOnKeyboard: true,
+          tabBarBadge: messagesTabBadge,
+          tabBarBadgeStyle: styles.tabBadge,
+        }}
+      />
       <Tab.Screen name="More" component={MoreStack} />
     </Tab.Navigator>
   );
@@ -74,5 +89,9 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  tabBadge: {
+    backgroundColor: colors.gold,
+    color: colors.background,
   },
 });

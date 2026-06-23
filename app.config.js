@@ -21,6 +21,7 @@ export default {
         backgroundColor: '#0A1F14',
       },
       edgeToEdgeEnabled: true,
+      softwareKeyboardLayoutMode: 'pan',
       predictiveBackGestureEnabled: false,
       package: 'com.chillslc.FootballPlayDesignerMobile',
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON,

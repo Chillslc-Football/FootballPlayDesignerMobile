@@ -11,6 +11,7 @@ import { navigationRef } from './src/navigation/navigationRef';
 import { TabNavigator } from './src/navigation/TabNavigator';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { TeamSelectorScreen } from './src/screens/TeamSelectorScreen';
+import { TeamMessageUnreadProvider } from './src/team/TeamMessageUnreadProvider';
 import { TeamProvider, useTeam } from './src/team/TeamProvider';
 import { colors } from './src/theme';
 import { pushDebugLog } from './src/notifications/pushDebugLog';
@@ -37,7 +38,9 @@ function AuthenticatedApp() {
         notifyTeamMessageNavigationReady();
       }}
     >
-      <TabNavigator />
+      <TeamMessageUnreadProvider>
+        <TabNavigator />
+      </TeamMessageUnreadProvider>
     </NavigationContainer>
   );
 }

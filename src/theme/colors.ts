@@ -1,17 +1,5 @@
-export const colors = {
-  background: '#0A1F14',
-  surface: '#14352A',
-  card: '#1B4332',
-  cardBorder: '#2D6A4F',
-  primary: '#2D6A4F',
-  primaryLight: '#40916C',
-  accent: '#95D5B2',
-  gold: '#D4AF37',
-  text: '#FFFFFF',
-  textSecondary: '#B7E4C7',
-  textMuted: '#74A892',
-  tabBar: '#0D2818',
-  tabBarActive: '#95D5B2',
-  tabBarInactive: '#52796F',
-  divider: '#2D6A4F',
-};
+/**
+ * Legacy color export for existing screens.
+ * Values are sourced from the design system to keep a single source of truth.
+ */
+export { legacyColors as colors } from '../design-system/colors';

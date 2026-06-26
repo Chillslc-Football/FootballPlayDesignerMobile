@@ -1,61 +1,58 @@
 /**
  * Canonical color palette — single source of truth for app styling.
  *
- * Premium dark appearance. Team-specific accent colors will be added in a
- * later phase; accent.default is a neutral placeholder until then.
+ * Premium dark appearance with graphite backgrounds and charcoal surfaces.
+ * Team-specific accent colors will be added in a later phase; accent.default
+ * is a neutral placeholder until then.
  *
- * Existing screens still import legacy `colors` from `src/theme/colors.ts`,
- * which maps to these values without changing rendered output.
+ * Existing screens import legacy `colors` from `src/theme/colors.ts`, which
+ * maps to these values.
  */
 export const palette = {
   background: {
-    /** Primary app background */
-    primary: '#0A1F14',
+    /** Primary app background — dark graphite */
+    primary: '#121214',
     /** Elevated surfaces, input fields */
-    secondary: '#14352A',
-    /** Cards and grouped content */
-    card: '#1B4332',
+    secondary: '#1C1C1F',
+    /** Cards and grouped content — charcoal */
+    card: '#252528',
   },
   border: {
-    default: '#2D6A4F',
-    subtle: '#1B4332',
+    default: '#3A3A3F',
+    subtle: '#2A2A2E',
   },
-  divider: '#2D6A4F',
+  divider: '#3A3A3F',
   text: {
     primary: '#FFFFFF',
-    secondary: '#B7E4C7',
-    muted: '#74A892',
-    disabled: '#52796F',
-    /** Legacy label accent used on section headings (maps to colors.gold) */
-    label: '#D4AF37',
+    secondary: '#C4C4C8',
+    muted: '#8E8E93',
+    disabled: '#6E6E73',
+    /** Section label accent — muted silver (maps to colors.gold) */
+    label: '#A8A8AD',
   },
   interactive: {
-    primary: '#2D6A4F',
-    primaryLight: '#40916C',
+    primary: '#4A4A52',
+    primaryLight: '#5C5C66',
   },
-  /**
-   * Neutral default accent until team-specific colors are implemented.
-   * Not wired into legacy `colors.accent` yet — screens still use legacy mint.
-   */
+  /** Neutral default accent until team-specific colors are implemented. */
   accent: {
-    default: '#8FA99E',
+    default: '#9A9AA3',
   },
   navigation: {
-    tabBar: '#0D2818',
-    tabActive: '#95D5B2',
-    tabInactive: '#52796F',
+    tabBar: '#0E0E10',
+    tabActive: '#F0F0F2',
+    tabInactive: '#6E6E73',
   },
   status: {
-    success: '#40916C',
+    success: '#5A9E7A',
     warning: '#B8956B',
-    error: '#F87171',
+    error: '#E07070',
     info: '#7BA3C9',
   },
 } as const;
 
 /**
  * Backward-compatible color names used by existing screens.
- * Values must remain identical to the pre-design-system palette.
  */
 export const legacyColors = {
   background: palette.background.primary,
@@ -64,7 +61,7 @@ export const legacyColors = {
   cardBorder: palette.border.default,
   primary: palette.interactive.primary,
   primaryLight: palette.interactive.primaryLight,
-  accent: palette.navigation.tabActive,
+  accent: palette.accent.default,
   gold: palette.text.label,
   text: palette.text.primary,
   textSecondary: palette.text.secondary,

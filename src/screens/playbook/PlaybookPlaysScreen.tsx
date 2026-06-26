@@ -5,23 +5,9 @@ import { PlaybookList } from '../../components/PlaybookList';
 import { PlaybookContent } from '../../components/PlaybookContent';
 import { PlaybookStackParamList } from '../../navigation/PlaybookStack';
 import { usePlaybook } from '../../playbook/PlaybookProvider';
-import { formatCategories, formatPlayType } from '../../utils/playDisplay';
+import { buildPlaySubtitle } from '../../utils/playDisplay';
 
 type Props = NativeStackScreenProps<PlaybookStackParamList, 'Plays'>;
-
-function buildPlaySubtitle(
-  playType: 'offensive' | 'defensive',
-  schemeLabel: string,
-  categories: string[],
-): string {
-  const parts = [formatPlayType(playType), schemeLabel];
-
-  if (categories.length > 0) {
-    parts.push(formatCategories(categories));
-  }
-
-  return parts.join(' · ');
-}
 
 export function PlaybookPlaysScreen({ navigation, route }: Props) {
   const { categoryName } = route.params;

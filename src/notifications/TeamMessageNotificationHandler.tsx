@@ -28,10 +28,10 @@ export function TeamMessageNotificationHandler() {
 
   const navigateToMessages = useCallback((): boolean => {
     const pending = peekPendingTeamMessageNavigation();
-    const navigated = navigateToTab('Messages');
+    const navigated = navigateToTab('Chat');
 
     if (navigated) {
-      logTeamMessagePush('navigated to Messages tab');
+      logTeamMessagePush('navigated to Chat tab');
 
       if (!pending?.threadId) {
         clearPendingTeamMessageNavigation();
@@ -68,7 +68,7 @@ export function TeamMessageNotificationHandler() {
     }
 
     if (!navigateToMessages()) {
-      logTeamMessagePush('pending Messages navigation waiting for nav ready', pending);
+      logTeamMessagePush('pending Chat navigation waiting for nav ready', pending);
     }
   }, [navigateToMessages, selectedTeam, teamLoading]);
 

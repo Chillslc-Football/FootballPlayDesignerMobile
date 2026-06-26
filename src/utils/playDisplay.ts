@@ -21,3 +21,17 @@ export function formatCategories(categories: string[]): string {
 
   return categories.join(', ');
 }
+
+export function buildPlaySubtitle(
+  playType: 'offensive' | 'defensive',
+  schemeLabel: string,
+  categories: string[],
+): string {
+  const parts = [formatPlayType(playType), schemeLabel];
+
+  if (categories.length > 0) {
+    parts.push(formatCategories(categories));
+  }
+
+  return parts.join(' · ');
+}

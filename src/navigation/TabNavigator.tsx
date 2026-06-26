@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import {
   CalendarScreen,
+  FilmScreen,
   HomeScreen,
   MessagesScreen,
   PlaybookScreen,
@@ -19,9 +20,11 @@ export type RootTabParamList = {
   Home: undefined;
   Playbook: undefined;
   Calendar: undefined;
-  Updates: undefined;
-  Messages: undefined;
+  Chat: undefined;
+  Film: undefined;
   More: undefined;
+  /** Hidden tab — reachable from Home, not shown in tab bar */
+  Updates: undefined;
 };
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -30,9 +33,10 @@ const tabIcons: Record<keyof RootTabParamList, string> = {
   Home: '🏠',
   Playbook: '📖',
   Calendar: '📅',
-  Updates: '📢',
-  Messages: '💬',
+  Chat: '💬',
+  Film: '🎬',
   More: '☰',
+  Updates: '📢',
 };
 
 function TabIcon({ label, color, focused }: { label: string; color: string; focused: boolean }) {
@@ -45,7 +49,7 @@ function TabIcon({ label, color, focused }: { label: string; color: string; focu
 
 export function TabNavigator() {
   const { unreadCount } = useTeamMessageUnread();
-  const messagesTabBadge = formatUnreadTabBadge(unreadCount);
+  const chatTabBadge = formatUnreadTabBadge(unreadCount);
 
   return (
     <Tab.Navigator
@@ -67,17 +71,25 @@ export function TabNavigator() {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Playbook" component={PlaybookScreen} />
       <Tab.Screen name="Calendar" component={CalendarScreen} />
-      <Tab.Screen name="Updates" component={TeamUpdatesScreen} options={{ title: 'Updates' }} />
       <Tab.Screen
-        name="Messages"
+        name="Chat"
         component={MessagesScreen}
         options={{
           tabBarHideOnKeyboard: true,
-          tabBarBadge: messagesTabBadge,
+          tabBarBadge: chatTabBadge,
           tabBarBadgeStyle: styles.tabBadge,
         }}
       />
+      <Tab.Screen name="Film" component={FilmScreen} />
       <Tab.Screen name="More" component={MoreStack} />
+      <Tab.Screen
+        name="Updates"
+        component={TeamUpdatesScreen}
+        options={{
+          title: 'Updates',
+          tabBarButton: () => null,
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -91,7 +103,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   tabBadge: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     color: colors.background,
   },
 });

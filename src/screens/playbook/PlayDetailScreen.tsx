@@ -5,6 +5,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { EditAssignmentsModal } from '../../components/EditAssignmentsModal';
 import { EditNotesModal } from '../../components/EditNotesModal';
 import { PlaybookContent } from '../../components/PlaybookContent';
+import { ZoomablePlayDiagramContainer } from '../../components/ZoomablePlayDiagramContainer';
 import { ReadOnlyPlayDiagram } from '../../playDiagram/ReadOnlyPlayDiagram';
 import { PlaybookStackParamList } from '../../navigation/PlaybookStack';
 import { usePlaybook } from '../../playbook/PlaybookProvider';
@@ -119,7 +120,9 @@ export function PlayDetailScreen({ route }: Props) {
       </View>
 
       {play.diagramPlay ? (
-        <ReadOnlyPlayDiagram play={play.diagramPlay} />
+        <ZoomablePlayDiagramContainer>
+          <ReadOnlyPlayDiagram play={play.diagramPlay} style={styles.zoomableDiagram} />
+        </ZoomablePlayDiagramContainer>
       ) : (
         <View style={styles.diagramUnavailable}>
           <Text style={styles.diagramUnavailableText}>Diagram unavailable for this play.</Text>
@@ -232,6 +235,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
     marginBottom: 16,
+  },
+  zoomableDiagram: {
+    marginBottom: 0,
+    borderRadius: 0,
   },
   diagramUnavailable: {
     height: 120,

@@ -1,25 +1,41 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  View,
 } from 'react-native';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { EventFormFieldError, EventFormFieldLabel } from '../../components/calendar/EventFormFieldLabel';
+import { EventFormPickerField } from '../../components/calendar/EventFormPickerField';
+import { inputPresets, palette, radius, spacing, typography } from '../../design-system';
 import { CalendarStackParamList } from '../../navigation/CalendarStack';
 import { createTeamEvent, updateTeamEvent } from '../../lib/teamEventRepository';
 import { useTeam } from '../../team/TeamProvider';
-import { colors } from '../../theme';
 import {
+  areRequiredEventFormFieldsComplete,
+  dateFromLocalDateAndTime,
+  dateFromLocalDateString,
   draftToFormValues,
+  formatFormDateDisplay,
+  formatFormTimeDisplay,
+  formatLocalDate,
+  formatLocalTime,
   formValuesToDraft,
+  getEventFormFieldErrors,
+  resolveFormEndTime,
   validateTeamEventForm,
 } from '../../utils/teamEventDisplay';
 
 type Props = NativeStackScreenProps<CalendarStackParamList, 'EventForm'>;
+
+type ActivePicker = 'date' | 'start' | 'end' | null;
 
 export function EventFormScreen({ navigation, route }: Props) {
   const { draft, editingExisting } = route.params;
@@ -29,16 +45,69 @@ export function EventFormScreen({ navigation, route }: Props) {
   const [title, setTitle] = useState(initialValues.title);
   const [date, setDate] = useState(initialValues.date);
   const [startTime, setStartTime] = useState(initialValues.startTime);
-  const [endTime, setEndTime] = useState(initialValues.endTime);
+  const [endTime, setEndTime] = useState(editingExisting ? initialValues.endTime : '');
   const [location, setLocation] = useState(initialValues.location);
   const [description, setDescription] = useState(initialValues.description);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [activePicker, setActivePicker] = useState<ActivePicker>(null);
 
+  const fieldErrors = useMemo(
+    () => getEventFormFieldErrors({ title, date, startTime, endTime }),
+    [title, date, startTime, endTime],
+  );
+
+  const requiredComplete = areRequiredEventFormFieldsComplete({ title, date, startTime });
   const validationError = validateTeamEventForm({ title, date, startTime, endTime });
-  const canSave = validationError === null && !saving;
+  const canSave = requiredComplete && validationError === null && !saving;
+
+  const showRequiredErrors = submitAttempted;
+
+  const pickerValue = useMemo(() => {
+    if (activePicker === 'date') {
+      return dateFromLocalDateString(date) ?? new Date();
+    }
+
+    if (activePicker === 'start') {
+      return dateFromLocalDateAndTime(date, startTime) ?? new Date();
+    }
+
+    if (activePicker === 'end') {
+      const resolvedEndTime = resolveFormEndTime(date, startTime, endTime);
+      return dateFromLocalDateAndTime(date, resolvedEndTime) ?? new Date();
+    }
+
+    return new Date();
+  }, [activePicker, date, endTime, startTime]);
+
+  const handlePickerChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setActivePicker(null);
+    }
+
+    if (event.type === 'dismissed' || !selectedDate) {
+      return;
+    }
+
+    if (activePicker === 'date') {
+      setDate(formatLocalDate(selectedDate));
+      return;
+    }
+
+    if (activePicker === 'start') {
+      setStartTime(formatLocalTime(selectedDate));
+      return;
+    }
+
+    if (activePicker === 'end') {
+      setEndTime(formatLocalTime(selectedDate));
+    }
+  };
 
   const handleSave = async () => {
+    setSubmitAttempted(true);
+
     const teamId = selectedTeam?.id;
 
     if (!teamId) {
@@ -48,7 +117,7 @@ export function EventFormScreen({ navigation, route }: Props) {
     const formError = validateTeamEventForm({ title, date, startTime, endTime });
 
     if (formError) {
-      setError(formError);
+      setError(null);
       return;
     }
 
@@ -88,73 +157,104 @@ export function EventFormScreen({ navigation, route }: Props) {
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.fieldLabel}>Title</Text>
-      <TextInput
-        style={styles.input}
-        value={title}
-        onChangeText={setTitle}
-        placeholder="Event title"
-        placeholderTextColor={colors.textMuted}
-        editable={!saving}
+      <View style={styles.field}>
+        <EventFormFieldLabel label="Event Title" required />
+        <TextInput
+          style={[styles.input, fieldErrors.title && showRequiredErrors && styles.inputError]}
+          value={title}
+          onChangeText={setTitle}
+          placeholder="Event title"
+          placeholderTextColor={inputPresets.default.placeholderColor}
+          editable={!saving}
+        />
+        <EventFormFieldError message={showRequiredErrors ? fieldErrors.title : null} />
+      </View>
+
+      <EventFormPickerField
+        label="Date"
+        value={formatFormDateDisplay(date)}
+        placeholder="Select date"
+        onPress={() => setActivePicker('date')}
+        disabled={saving}
+        required
+        error={showRequiredErrors ? fieldErrors.date : null}
       />
 
-      <Text style={styles.fieldLabel}>Date</Text>
-      <TextInput
-        style={styles.input}
-        value={date}
-        onChangeText={setDate}
-        placeholder="YYYY-MM-DD"
-        placeholderTextColor={colors.textMuted}
-        autoCapitalize="none"
-        autoCorrect={false}
-        editable={!saving}
+      <EventFormPickerField
+        label="Start Time"
+        value={formatFormTimeDisplay(startTime)}
+        placeholder="Select start time"
+        onPress={() => setActivePicker('start')}
+        disabled={saving}
+        required
+        error={showRequiredErrors ? fieldErrors.startTime : null}
       />
 
-      <Text style={styles.fieldLabel}>Start time</Text>
-      <TextInput
-        style={styles.input}
-        value={startTime}
-        onChangeText={setStartTime}
-        placeholder="HH:MM"
-        placeholderTextColor={colors.textMuted}
-        autoCapitalize="none"
-        autoCorrect={false}
-        editable={!saving}
+      <EventFormPickerField
+        label="End Time"
+        value={formatFormTimeDisplay(endTime)}
+        placeholder="No end time selected"
+        onPress={() => setActivePicker('end')}
+        disabled={saving}
+        optional
+        error={fieldErrors.endTime}
       />
 
-      <Text style={styles.fieldLabel}>End time</Text>
-      <TextInput
-        style={styles.input}
-        value={endTime}
-        onChangeText={setEndTime}
-        placeholder="HH:MM"
-        placeholderTextColor={colors.textMuted}
-        autoCapitalize="none"
-        autoCorrect={false}
-        editable={!saving}
-      />
+      {endTime ? (
+        <Pressable
+          style={({ pressed }) => [styles.clearEndButton, pressed && styles.clearEndButtonPressed]}
+          onPress={() => setEndTime('')}
+          disabled={saving}
+        >
+          <Text style={styles.clearEndButtonText}>Clear end time</Text>
+        </Pressable>
+      ) : null}
 
-      <Text style={styles.fieldLabel}>Location</Text>
-      <TextInput
-        style={styles.input}
-        value={location}
-        onChangeText={setLocation}
-        placeholder="Optional location"
-        placeholderTextColor={colors.textMuted}
-        editable={!saving}
-      />
+      {activePicker ? (
+        <View style={styles.pickerContainer}>
+          <DateTimePicker
+            value={pickerValue}
+            mode={activePicker === 'date' ? 'date' : 'time'}
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handlePickerChange}
+            is24Hour={false}
+          />
+          {Platform.OS === 'ios' ? (
+            <Pressable
+              style={({ pressed }) => [styles.pickerDoneButton, pressed && styles.pickerDonePressed]}
+              onPress={() => setActivePicker(null)}
+            >
+              <Text style={styles.pickerDoneText}>Done</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
-      <Text style={styles.fieldLabel}>Description</Text>
-      <TextInput
-        style={[styles.input, styles.descriptionInput]}
-        value={description}
-        onChangeText={setDescription}
-        placeholder="Optional description"
-        placeholderTextColor={colors.textMuted}
-        multiline
-        textAlignVertical="top"
-        editable={!saving}
-      />
+      <View style={styles.field}>
+        <EventFormFieldLabel label="Location" optional />
+        <TextInput
+          style={styles.input}
+          value={location}
+          onChangeText={setLocation}
+          placeholder="Add a location"
+          placeholderTextColor={inputPresets.default.placeholderColor}
+          editable={!saving}
+        />
+      </View>
+
+      <View style={styles.field}>
+        <EventFormFieldLabel label="Description" optional />
+        <TextInput
+          style={[styles.input, styles.descriptionInput]}
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Add details about this event"
+          placeholderTextColor={inputPresets.default.placeholderColor}
+          multiline
+          textAlignVertical="top"
+          editable={!saving}
+        />
+      </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -167,7 +267,7 @@ export function EventFormScreen({ navigation, route }: Props) {
         disabled={!canSave}
       >
         {saving ? (
-          <ActivityIndicator color={colors.background} size="small" />
+          <ActivityIndicator color={palette.background.primary} size="small" />
         ) : (
           <Text style={styles.saveButtonText}>
             {editingExisting ? 'Save Changes' : 'Create Event'}
@@ -181,54 +281,84 @@ export function EventFormScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: palette.background.primary,
   },
   content: {
-    paddingHorizontal: 20,
-    paddingBottom: 32,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxxl,
   },
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 8,
+  field: {
+    marginBottom: spacing.lg,
   },
   input: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: colors.text,
-    marginBottom: 16,
+    ...inputPresets.default.field,
+    marginBottom: 0,
+  },
+  inputError: {
+    borderColor: palette.status.error,
   },
   descriptionInput: {
-    minHeight: 120,
+    ...inputPresets.multiline.field,
+    marginBottom: 0,
+  },
+  clearEndButton: {
+    alignSelf: 'flex-start',
+    marginTop: -spacing.sm,
+    marginBottom: spacing.lg,
+    paddingVertical: spacing.xs,
+  },
+  clearEndButtonPressed: {
+    opacity: 0.85,
+  },
+  clearEndButtonText: {
+    ...typography.bodySmall,
+    color: palette.accent.default,
+    fontWeight: typography.subheading.fontWeight,
+  },
+  pickerContainer: {
+    backgroundColor: palette.background.card,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: palette.border.default,
+    marginBottom: spacing.lg,
+    overflow: 'hidden',
+  },
+  pickerDoneButton: {
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: palette.divider,
+  },
+  pickerDonePressed: {
+    opacity: 0.85,
+  },
+  pickerDoneText: {
+    ...typography.bodySmall,
+    fontWeight: typography.subheading.fontWeight,
+    color: palette.accent.default,
   },
   error: {
-    fontSize: 15,
-    color: colors.gold,
-    marginBottom: 16,
+    ...typography.bodySmall,
+    color: palette.status.error,
+    marginBottom: spacing.lg,
   },
   saveButton: {
-    marginTop: 8,
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingVertical: 12,
+    marginTop: spacing.sm,
+    backgroundColor: palette.interactive.primary,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: palette.border.default,
+    paddingVertical: spacing.md + 2,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 44,
+    minHeight: 48,
   },
   saveButtonDisabled: {
     opacity: 0.6,
   },
   saveButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.background,
+    ...typography.subheading,
+    fontWeight: typography.heading.fontWeight,
+    color: palette.text.primary,
   },
 });

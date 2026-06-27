@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -9,52 +9,22 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
+import { CalendarListView } from '../../components/calendar/CalendarListView';
+import { CalendarMonthView } from '../../components/calendar/CalendarMonthView';
+import { CalendarScheduleView } from '../../components/calendar/CalendarScheduleView';
+import { CalendarViewModeSelector } from '../../components/calendar/CalendarViewModeSelector';
 import { ScreenContainer } from '../../components/ScreenContainer';
+import { palette, radius, spacing, typography } from '../../design-system';
 import { CalendarStackParamList } from '../../navigation/CalendarStack';
 import { fetchTeamEventsByTeam } from '../../lib/teamEventRepository';
 import { useTeam } from '../../team/TeamProvider';
-import { colors } from '../../theme';
+import { DEFAULT_CALENDAR_VIEW_MODE, type CalendarViewMode } from '../../types/calendarView';
 import { createEmptyTeamEventDraft, type TeamEvent } from '../../types/teamEvent';
 import { canEditPlayMetadata } from '../../utils/canEditPlayMetadata';
-import {
-  formatTeamEventDateTimeRange,
-  isPastTeamEvent,
-  partitionTeamEventsByUpcomingPast,
-  previewTeamEventDescription,
-} from '../../utils/teamEventDisplay';
+import { loadCalendarViewMode, saveCalendarViewMode } from '../../utils/calendarViewPreference';
+import { startOfDay } from '../../utils/calendarViewDisplay';
 
 type NavigationProp = NativeStackNavigationProp<CalendarStackParamList, 'EventList'>;
-
-function EventCard({
-  event,
-  isPast,
-  onPress,
-}: {
-  event: TeamEvent;
-  isPast: boolean;
-  onPress: () => void;
-}) {
-  const location = event.location?.trim();
-  const descriptionPreview = previewTeamEventDescription(event.description);
-
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.eventCard,
-        isPast && styles.eventCardPast,
-        pressed && styles.eventCardPressed,
-      ]}
-      onPress={onPress}
-    >
-      <Text style={[styles.eventTitle, isPast && styles.eventTitlePast]}>{event.title}</Text>
-      <Text style={styles.eventMeta}>{formatTeamEventDateTimeRange(event.starts_at, event.ends_at)}</Text>
-      {location ? <Text style={styles.eventLocation}>{location}</Text> : null}
-      {descriptionPreview ? (
-        <Text style={styles.eventDescription}>{descriptionPreview}</Text>
-      ) : null}
-    </Pressable>
-  );
-}
 
 export function CalendarEventListScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -62,12 +32,31 @@ export function CalendarEventListScreen() {
   const [events, setEvents] = useState<TeamEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<CalendarViewMode>(DEFAULT_CALENDAR_VIEW_MODE);
+  const [viewModeLoaded, setViewModeLoaded] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
+  const [visibleMonth, setVisibleMonth] = useState(() => startOfDay(new Date()));
   const loadedTeamIdRef = useRef<string | null>(null);
   const selectedTeamIdRef = useRef<string | null>(null);
 
   const canManageEvents = canEditPlayMetadata(selectedTeamMemberRole);
 
   selectedTeamIdRef.current = selectedTeam?.id ?? null;
+
+  useEffect(() => {
+    let active = true;
+
+    void loadCalendarViewMode().then((mode) => {
+      if (active) {
+        setViewMode(mode);
+        setViewModeLoaded(true);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const loadEvents = useCallback(async (teamId: string) => {
     setLoading(true);
@@ -114,6 +103,17 @@ export function CalendarEventListScreen() {
     }, [selectedTeam?.id, loadEvents]),
   );
 
+  const handleViewModeChange = (mode: CalendarViewMode) => {
+    setViewMode(mode);
+    void saveCalendarViewMode(mode);
+  };
+
+  const handleSelectDate = (date: Date) => {
+    const normalized = startOfDay(date);
+    setSelectedDate(normalized);
+    setVisibleMonth(normalized);
+  };
+
   const handleCreateEvent = () => {
     navigation.navigate('EventForm', {
       draft: createEmptyTeamEventDraft(),
@@ -125,69 +125,58 @@ export function CalendarEventListScreen() {
     navigation.navigate('EventDetail', { event });
   };
 
-  const { upcoming, past } = partitionTeamEventsByUpcomingPast(events);
-
-  if (loading) {
+  if (loading || !viewModeLoaded) {
     return (
       <ScreenContainer title="Calendar" subtitle={selectedTeam?.name} scrollable={false}>
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.accent} />
+          <ActivityIndicator size="large" color={palette.accent.default} />
         </View>
       </ScreenContainer>
     );
   }
 
   return (
-    <ScreenContainer title="Calendar" subtitle={selectedTeam?.name}>
+    <ScreenContainer title="Calendar" subtitle={selectedTeam?.name ?? 'Team schedule'}>
+      <CalendarViewModeSelector value={viewMode} onChange={handleViewModeChange} />
+
       {canManageEvents ? (
         <Pressable
-          style={({ pressed }) => [styles.createButton, pressed && styles.createButtonPressed]}
+          style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
           onPress={handleCreateEvent}
         >
-          <Text style={styles.createButtonText}>Create Event</Text>
+          <Text style={styles.addButtonText}>+ Add Event</Text>
         </Pressable>
       ) : null}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      {!error && events.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No team events scheduled yet.</Text>
-        </View>
+      {viewMode === 'month' ? (
+        <CalendarMonthView
+          events={events}
+          visibleMonth={visibleMonth}
+          selectedDate={selectedDate}
+          onVisibleMonthChange={setVisibleMonth}
+          onSelectDate={handleSelectDate}
+          onOpenEvent={handleOpenEvent}
+        />
       ) : null}
 
-      {upcoming.length > 0 ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Upcoming</Text>
-          {upcoming.map((event) => (
-            <EventCard
-              key={event.id}
-              event={event}
-              isPast={false}
-              onPress={() => handleOpenEvent(event)}
-            />
-          ))}
-        </View>
+      {viewMode === 'schedule' ? (
+        <CalendarScheduleView
+          events={events}
+          selectedDate={selectedDate}
+          onSelectedDateChange={handleSelectDate}
+          onOpenEvent={handleOpenEvent}
+        />
       ) : null}
 
-      {!error && events.length > 0 && upcoming.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No upcoming events.</Text>
-        </View>
-      ) : null}
-
-      {past.length > 0 ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Past</Text>
-          {past.map((event) => (
-            <EventCard
-              key={event.id}
-              event={event}
-              isPast={isPastTeamEvent(event)}
-              onPress={() => handleOpenEvent(event)}
-            />
-          ))}
-        </View>
+      {viewMode === 'list' ? (
+        <CalendarListView
+          events={events}
+          canManageEvents={canManageEvents}
+          hasError={Boolean(error)}
+          onOpenEvent={handleOpenEvent}
+        />
       ) : null}
     </ScreenContainer>
   );
@@ -198,92 +187,32 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
+    paddingVertical: spacing.xxxl + spacing.lg,
   },
-  createButton: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 16,
+  addButton: {
+    width: '100%',
+    backgroundColor: palette.interactive.primary,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: palette.border.default,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md + 2,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
   },
-  createButtonPressed: {
-    opacity: 0.85,
+  addButtonPressed: {
+    opacity: 0.88,
   },
-  createButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.background,
+  addButtonText: {
+    ...typography.subheading,
+    fontWeight: typography.heading.fontWeight,
+    color: palette.text.primary,
   },
   error: {
-    fontSize: 15,
-    color: colors.gold,
-    marginBottom: 16,
-  },
-  emptyState: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  emptyText: {
-    fontSize: 15,
-    color: colors.textMuted,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  section: {
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 12,
-  },
-  eventCard: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    padding: 16,
-    marginBottom: 12,
-  },
-  eventCardPast: {
-    opacity: 0.75,
-  },
-  eventCardPressed: {
-    opacity: 0.9,
-  },
-  eventTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.text,
-    lineHeight: 24,
-    marginBottom: 8,
-  },
-  eventTitlePast: {
-    color: colors.textSecondary,
-  },
-  eventMeta: {
-    fontSize: 14,
-    color: colors.textMuted,
-    marginBottom: 8,
-  },
-  eventLocation: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    marginBottom: 8,
-  },
-  eventDescription: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.textSecondary,
+    ...typography.bodySmall,
+    color: palette.status.error,
+    marginBottom: spacing.lg,
   },
 });

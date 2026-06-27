@@ -34,6 +34,7 @@ export default {
           defaultChannel: 'default',
         },
       ],
+      '@react-native-community/datetimepicker',
     ],
     web: {
       favicon: './assets/favicon.png',

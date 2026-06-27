@@ -1,5 +1,8 @@
+import { listDmEligibleMembers } from './teamMessageRepository';
 import { supabase } from './supabase';
-import type { Team, TeamMembership, TeamRole } from '../types/team';
+import type { ProfileNameFields } from '../types/profile';
+import type { Team, TeamMembership, TeamRole, TeamRosterMember } from '../types/team';
+import { resolveProfileDisplayName } from '../utils/profileDisplay';
 
 type TeamMemberJoinRow = {
   role: TeamRole;
@@ -55,6 +58,73 @@ export async function fetchUserTeamMemberships(userId: string): Promise<{
     memberships,
     lastTeamId: profileResult.data?.last_team_id ?? null,
   };
+}
+
+type TeamRosterJoinRow = {
+  user_id: string;
+  role: TeamRole;
+  profiles: (ProfileNameFields & { id: string }) | (ProfileNameFields & { id: string })[] | null;
+};
+
+function normalizeProfile(
+  value: TeamRosterJoinRow['profiles'],
+): (ProfileNameFields & { id: string }) | null {
+  if (!value) {
+    return null;
+  }
+
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+export async function fetchTeamRoster(teamId: string): Promise<TeamRosterMember[]> {
+  const { data, error } = await supabase
+    .from('team_members')
+    .select('user_id, role, profiles(display_name, email)')
+    .eq('team_id', teamId);
+
+  if (error) {
+    const members = await listDmEligibleMembers(teamId);
+
+    return members.map((member) => ({
+      user_id: member.user_id,
+      role: member.role as TeamRole,
+      display_name: member.display_name,
+    }));
+  }
+
+  const roster: TeamRosterMember[] = [];
+
+  for (const row of (data ?? []) as TeamRosterJoinRow[]) {
+    const profile = normalizeProfile(row.profiles);
+
+    roster.push({
+      user_id: row.user_id,
+      role: row.role,
+      display_name: resolveProfileDisplayName(profile),
+    });
+  }
+
+  roster.sort((left, right) => {
+    const leftLabel = left.display_name ?? '';
+    const rightLabel = right.display_name ?? '';
+    return leftLabel.localeCompare(rightLabel, undefined, { sensitivity: 'base' });
+  });
+
+  return roster;
+}
+
+export async function fetchProfileDisplayName(userId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('display_name, email')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return resolveProfileDisplayName(data);
 }
 
 export async function updateLastTeamId(userId: string, teamId: string): Promise<void> {

@@ -11,3 +11,9 @@ export type TeamMembership = {
   role: TeamRole;
   team: Team;
 };
+
+export type TeamRosterMember = {
+  user_id: string;
+  role: TeamRole;
+  display_name: string | null;
+};

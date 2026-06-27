@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -12,11 +12,13 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { getConversationTitle } from '../../constants/teamChatConstants';
 import { ScreenContainer } from '../../components/ScreenContainer';
+import { ProfileAvatar } from '../../components/roster/ProfileAvatar';
 import {
   getOrCreateDirectMessageThread,
   listAccessibleTeamMessageThreads,
   listDirectMessageThreads,
 } from '../../lib/teamMessageRepository';
+import { useAvatarSignedUrlMap } from '../../hooks/useAvatarSignedUrlMap';
 import { MessagesStackParamList } from '../../navigation/MessagesStack';
 import { useTeam } from '../../team/TeamProvider';
 import {
@@ -41,10 +43,16 @@ function ConversationRow({
   title,
   unreadCount,
   onPress,
+  showAvatar = false,
+  signedUrl = null,
+  displayName,
 }: {
   title: string;
   unreadCount: number;
   onPress: () => void;
+  showAvatar?: boolean;
+  signedUrl?: string | null;
+  displayName?: string | null;
 }) {
   const unreadBadge = formatUnreadTabBadge(unreadCount);
 
@@ -53,6 +61,13 @@ function ConversationRow({
       style={({ pressed }) => [styles.conversationRow, pressed && styles.conversationRowPressed]}
       onPress={onPress}
     >
+      {showAvatar ? (
+        <ProfileAvatar
+          signedUrl={signedUrl}
+          displayName={displayName}
+          size="sm"
+        />
+      ) : null}
       <View style={styles.conversationMain}>
         <Text style={styles.conversationTitle}>{title}</Text>
         {unreadBadge ? (
@@ -248,6 +263,12 @@ export function ConversationListScreen() {
 
   const subtitle = selectedTeam?.name ? selectedTeam.name : undefined;
 
+  const directMessageAvatarPaths = useMemo(
+    () => directMessages.map((thread) => thread.other_avatar_url),
+    [directMessages],
+  );
+  const { signedUrlsByPath } = useAvatarSignedUrlMap(directMessageAvatarPaths);
+
   return (
     <ScreenContainer title="Messages" subtitle={subtitle} scrollable={false}>
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -313,6 +334,13 @@ export function ConversationListScreen() {
                 key={thread.id}
                 title={getConversationTitle(thread)}
                 unreadCount={thread.unread_count}
+                showAvatar
+                signedUrl={
+                  thread.other_avatar_url
+                    ? (signedUrlsByPath.get(thread.other_avatar_url) ?? null)
+                    : null
+                }
+                displayName={thread.other_display_name}
                 onPress={() => handleSelectDirectMessage(thread)}
               />
             ))
@@ -398,6 +426,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 10,
     backgroundColor: colors.card,
     borderRadius: 12,
     borderWidth: 1,

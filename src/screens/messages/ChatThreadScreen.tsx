@@ -16,8 +16,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { TeamMessageBody } from '../../components/TeamMessageBody';
+import { ChatMessageRow } from '../../components/messages/ChatMessageRow';
 import { useAuth } from '../../auth/AuthProvider';
+import { useAvatarSignedUrlMap } from '../../hooks/useAvatarSignedUrlMap';
 import {
   fetchTeamMessagesByThread,
   listDmEligibleMembers,
@@ -30,7 +31,6 @@ import { useTeam } from '../../team/TeamProvider';
 import { useTeamMessageUnread } from '../../team/TeamMessageUnreadProvider';
 import { colors } from '../../theme';
 import type { DirectMessageEligibleMember, PickedUserMention, TeamMessage } from '../../types/teamMessage';
-import { formatTeamUpdateDate } from '../../utils/teamUpdateDisplay';
 import { encodeMessageBodyForStorage } from '../../utils/teamMessageMentionUtils';
 import {
   buildPickedUserMention,
@@ -92,6 +92,12 @@ export function ChatThreadScreen({ route }: Props) {
   }, [activeMentionQuery, mentionMembers, mentionMenuForceHidden]);
 
   const showMentionMenu = mentionSuggestions.length > 0 && activeMentionQuery !== null;
+
+  const senderAvatarPaths = useMemo(
+    () => messages.map((message) => message.sender_avatar_url),
+    [messages],
+  );
+  const { signedUrlsByPath } = useAvatarSignedUrlMap(senderAvatarPaths);
 
   const scrollToLatestMessage = useCallback(() => {
     if (messages.length === 0) {
@@ -378,12 +384,15 @@ export function ChatThreadScreen({ route }: Props) {
               ) : null
             }
             renderItem={({ item: message }) => (
-              <View style={styles.messageCard}>
-                <Text style={styles.messageMeta}>
-                  {senderLabel(message, user?.id)} · {formatTeamUpdateDate(message.created_at)}
-                </Text>
-                <TeamMessageBody body={message.body} />
-              </View>
+              <ChatMessageRow
+                message={message}
+                senderLabel={senderLabel(message, user?.id)}
+                signedUrl={
+                  message.sender_avatar_url
+                    ? (signedUrlsByPath.get(message.sender_avatar_url) ?? null)
+                    : null
+                }
+              />
             )}
           />
         )}
@@ -481,19 +490,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     lineHeight: 22,
-  },
-  messageCard: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    padding: 16,
-    marginBottom: 12,
-  },
-  messageMeta: {
-    fontSize: 13,
-    color: colors.textMuted,
-    marginBottom: 8,
   },
   composerSafeArea: {
     backgroundColor: colors.background,

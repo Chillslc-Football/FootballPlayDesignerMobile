@@ -9,12 +9,12 @@ import {
   getTeamManagementPrimaryLabel,
   getTeamManagementSecondaryEmail,
 } from '../../utils/teamManagementRoster';
-import { ProfileInitialsAvatar } from '../roster/ProfileInitialsAvatar';
+import { ProfileAvatar } from '../roster/ProfileAvatar';
 import { PhoneActions } from '../phone/PhoneActions';
-import { getRosterPlayerInitials } from '../../utils/rosterDisplay';
 
 type TeamManagementRosterItemProps = {
   row: TeamManagementRosterRow;
+  signedUrl?: string | null;
   isLast?: boolean;
   canRemove?: boolean;
   removing?: boolean;
@@ -56,6 +56,7 @@ function getStatusColors(
 
 export function TeamManagementRosterItem({
   row,
+  signedUrl = null,
   isLast = false,
   canRemove = false,
   removing = false,
@@ -151,7 +152,12 @@ export function TeamManagementRosterItem({
 
   return (
     <View style={[styles.item, !isLast && styles.itemBorder]}>
-      <ProfileInitialsAvatar initials={getRosterPlayerInitials(primaryLabel)} />
+      <ProfileAvatar
+        signedUrl={row.kind === 'member' ? signedUrl : null}
+        displayName={row.kind === 'member' ? row.name : null}
+        email={row.email}
+        size="md"
+      />
       <View style={styles.content}>
         <Text style={styles.name}>{primaryLabel}</Text>
         {secondaryEmail ? <Text style={styles.email}>{secondaryEmail}</Text> : null}

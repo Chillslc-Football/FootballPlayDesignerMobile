@@ -6,7 +6,7 @@ import type {
 } from '../types/profile';
 import { supabase } from './supabase';
 
-export const PROFILE_MEMBER_COLUMNS = 'id, display_name, email, phone';
+export const PROFILE_MEMBER_COLUMNS = 'id, display_name, email, phone, avatar_url';
 
 const USER_PROFILE_COLUMNS = `${PROFILE_MEMBER_COLUMNS}, avatar_url`;
 
@@ -28,6 +28,7 @@ export function normalizeProfileMemberFields(row: ProfileNameFields): ProfileMem
     display_name: normalizeOptionalString(row.display_name),
     email: normalizeOptionalString(row.email),
     phone: normalizeOptionalString(row.phone),
+    avatar_url: normalizeOptionalString(row.avatar_url),
   };
 }
 

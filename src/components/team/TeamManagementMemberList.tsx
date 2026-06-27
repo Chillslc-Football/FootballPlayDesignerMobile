@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../../auth/AuthProvider';
 import { typography } from '../../design-system';
 import { useAppTheme } from '../../design-system/AppThemeProvider';
+import { useAvatarSignedUrlMap } from '../../hooks/useAvatarSignedUrlMap';
 import { removeTeamMember } from '../../lib/teamRepository';
 import { useTeam } from '../../team/TeamProvider';
 import type { TeamManagementMemberRosterRow } from '../../types/teamRoster';
@@ -25,6 +26,15 @@ export function TeamManagementMemberList() {
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
 
   const canManageTeam = canEditPlayMetadata(selectedTeamMemberRole);
+
+  const memberAvatarPaths = useMemo(
+    () =>
+      rosterRows
+        .filter((row): row is TeamManagementMemberRosterRow => row.kind === 'member')
+        .map((row) => row.avatar_url),
+    [rosterRows],
+  );
+  const { signedUrlsByPath } = useAvatarSignedUrlMap(memberAvatarPaths);
 
   const styles = useMemo(
     () =>
@@ -135,6 +145,11 @@ export function TeamManagementMemberList() {
             <TeamManagementRosterItem
               key={row.id}
               row={row}
+              signedUrl={
+                row.kind === 'member' && row.avatar_url
+                  ? (signedUrlsByPath.get(row.avatar_url) ?? null)
+                  : null
+              }
               isLast={index === rosterRows.length - 1}
               canRemove={canRemove}
               removing={row.kind === 'member' && removingUserId === row.user_id}

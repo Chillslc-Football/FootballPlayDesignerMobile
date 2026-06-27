@@ -25,6 +25,7 @@ export type TeamMessageThreadWithUnread = TeamMessageThread & {
 export type DirectMessageThreadWithUnread = TeamMessageThreadWithUnread & {
   other_user_id: string;
   other_display_name: string | null;
+  other_avatar_url: string | null;
 };
 
 export type DirectMessageEligibleMember = {
@@ -54,6 +55,7 @@ export type TeamMessage = {
   team_id: string;
   sender_id: string;
   sender_name: string | null;
+  sender_avatar_url: string | null;
   body: string;
   mention_audiences: TeamMessageMentionAudience[];
   created_at: string;

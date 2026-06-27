@@ -37,6 +37,7 @@ async function fetchTeamManagementMembers(
       display_name: profile?.display_name ?? null,
       email: profile?.email ?? null,
       phone: profile?.phone ?? null,
+      avatar_url: profile?.avatar_url ?? null,
     };
   });
 }

@@ -7,19 +7,24 @@ import type { TeamRosterMember } from '../../types/team';
 import {
   formatRosterJerseyNumber,
   formatRosterPositionLine,
-  getRosterPlayerInitials,
   getRosterPlayerLabel,
 } from '../../utils/rosterDisplay';
-import { ProfileInitialsAvatar } from './ProfileInitialsAvatar';
+import { ProfileAvatar } from './ProfileAvatar';
 import { PhoneActions } from '../phone/PhoneActions';
 
 type RosterPlayerCardProps = {
   player: TeamRosterMember;
+  signedUrl?: string | null;
   onPress: () => void;
   isLast?: boolean;
 };
 
-export function RosterPlayerCard({ player, onPress, isLast = false }: RosterPlayerCardProps) {
+export function RosterPlayerCard({
+  player,
+  signedUrl = null,
+  onPress,
+  isLast = false,
+}: RosterPlayerCardProps) {
   const { palette, colors } = useAppTheme();
   const label = getRosterPlayerLabel(player);
   const jerseyLabel = formatRosterJerseyNumber(player.jersey_number);
@@ -88,7 +93,12 @@ export function RosterPlayerCard({ player, onPress, isLast = false }: RosterPlay
       ]}
       onPress={onPress}
     >
-      <ProfileInitialsAvatar initials={getRosterPlayerInitials(label)} />
+      <ProfileAvatar
+        signedUrl={signedUrl}
+        displayName={player.display_name}
+        email={player.email}
+        size="md"
+      />
       <View style={styles.content}>
         {jerseyLabel ? <Text style={styles.jersey}>{jerseyLabel}</Text> : null}
         <Text style={styles.name}>{label}</Text>

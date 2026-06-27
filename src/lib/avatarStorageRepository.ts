@@ -69,6 +69,61 @@ export async function createAvatarSignedUrl(
   return data.signedUrl;
 }
 
+export async function createAvatarSignedUrls(
+  storagePaths: Array<string | null | undefined>,
+): Promise<Map<string, string>> {
+  const uniquePaths = [
+    ...new Set(
+      storagePaths
+        .map((path) => path?.trim())
+        .filter((path): path is string => Boolean(path)),
+    ),
+  ];
+
+  const signedUrlsByPath = new Map<string, string>();
+  const pathsToSign: string[] = [];
+
+  for (const path of uniquePaths) {
+    const cached = signedUrlCache.get(path);
+
+    if (cached && cached.expiresAt > Date.now() + CACHE_REFRESH_BUFFER_MS) {
+      signedUrlsByPath.set(path, cached.signedUrl);
+      continue;
+    }
+
+    pathsToSign.push(path);
+  }
+
+  if (pathsToSign.length === 0) {
+    return signedUrlsByPath;
+  }
+
+  const { data, error } = await supabase.storage
+    .from(AVATAR_BUCKET)
+    .createSignedUrls(pathsToSign, AVATAR_SIGNED_URL_TTL_SECONDS);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  for (const item of data ?? []) {
+    const path = item.path?.trim();
+    const signedUrl = item.signedUrl?.trim();
+
+    if (!path || !signedUrl || item.error) {
+      continue;
+    }
+
+    signedUrlCache.set(path, {
+      signedUrl,
+      expiresAt: Date.now() + AVATAR_SIGNED_URL_TTL_SECONDS * 1000,
+    });
+    signedUrlsByPath.set(path, signedUrl);
+  }
+
+  return signedUrlsByPath;
+}
+
 export async function uploadAvatarFile(
   userId: string,
   image: AvatarUploadPayload,

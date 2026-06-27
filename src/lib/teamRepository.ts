@@ -480,6 +480,7 @@ export async function fetchTeamRoster(teamId: string): Promise<TeamRosterMember[
       display_name: profile ? resolveProfileDisplayName(profile) : null,
       email: profile?.email ?? null,
       phone: profile?.phone ?? null,
+      avatar_url: profile?.avatar_url ?? null,
       ...mapRosterMemberPlayerInfo(row),
     };
   });

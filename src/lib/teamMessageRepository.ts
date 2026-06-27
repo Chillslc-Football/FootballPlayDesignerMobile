@@ -1,7 +1,7 @@
-import { PROFILE_MEMBER_COLUMNS } from './profileRepository';
+import { fetchProfileMembersByUserIds } from './profileRepository';
 import { supabase } from './supabase';
 import { createSafeRealtimeUnsubscribe } from './realtimeChannelCleanup';
-import type { ProfileNameFields } from '../types/profile';
+import type { ProfileMemberFields } from '../types/profile';
 import type {
   DirectMessageEligibleMember,
   DirectMessageThreadWithUnread,
@@ -51,10 +51,6 @@ type TeamMessageRow = {
   deleted_at: string | null;
 };
 
-type ProfileRow = ProfileNameFields & {
-  id: string;
-};
-
 const MESSAGE_COLUMNS =
   'id, thread_id, team_id, sender_id, body, mention_audiences, created_at, edited_at, deleted_at';
 
@@ -98,60 +94,57 @@ function rowToDirectThreadWithUnread(
     ...rowToThreadWithUnread(row),
     other_user_id: row.other_user_id,
     other_display_name: row.other_display_name,
+    other_avatar_url: null,
   };
+}
+
+async function enrichDirectThreadsWithOtherUserAvatars(
+  threads: DirectMessageThreadWithUnread[],
+): Promise<DirectMessageThreadWithUnread[]> {
+  if (threads.length === 0) {
+    return threads;
+  }
+
+  const otherUserIds = [...new Set(threads.map((thread) => thread.other_user_id))];
+  const profileByUserId = await fetchProfileMembersByUserIds(otherUserIds);
+
+  return threads.map((thread) => ({
+    ...thread,
+    other_avatar_url: profileByUserId.get(thread.other_user_id)?.avatar_url ?? null,
+  }));
 }
 
 function collectUniqueSenderIds(rows: TeamMessageRow[]): string[] {
   return [...new Set(rows.map((row) => row.sender_id))];
 }
 
-async function fetchSenderNamesByUserIds(
-  userIds: string[],
-): Promise<Map<string, string | null>> {
-  const nameByUserId = new Map<string, string | null>();
-
-  if (userIds.length === 0) {
-    return nameByUserId;
-  }
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .select(PROFILE_MEMBER_COLUMNS)
-    .in('id', userIds);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  for (const row of (data ?? []) as ProfileRow[]) {
-    nameByUserId.set(row.id, resolveProfileDisplayName(row));
-  }
-
-  return nameByUserId;
-}
-
 function rowsToMessages(
   rows: TeamMessageRow[],
-  nameBySenderId: Map<string, string | null>,
+  profileBySenderId: Map<string, ProfileMemberFields>,
 ): TeamMessage[] {
-  return rows.map((row) => ({
-    id: row.id,
-    thread_id: row.thread_id,
-    team_id: row.team_id,
-    sender_id: row.sender_id,
-    sender_name: nameBySenderId.get(row.sender_id) ?? null,
-    body: row.body,
-    mention_audiences: row.mention_audiences ?? [],
-    created_at: row.created_at,
-    edited_at: row.edited_at,
-    deleted_at: row.deleted_at,
-  }));
+  return rows.map((row) => {
+    const profile = profileBySenderId.get(row.sender_id);
+
+    return {
+      id: row.id,
+      thread_id: row.thread_id,
+      team_id: row.team_id,
+      sender_id: row.sender_id,
+      sender_name: profile ? resolveProfileDisplayName(profile) : null,
+      sender_avatar_url: profile?.avatar_url ?? null,
+      body: row.body,
+      mention_audiences: row.mention_audiences ?? [],
+      created_at: row.created_at,
+      edited_at: row.edited_at,
+      deleted_at: row.deleted_at,
+    };
+  });
 }
 
-async function enrichMessagesWithSenderNames(rows: TeamMessageRow[]): Promise<TeamMessage[]> {
+async function enrichMessagesWithSenderProfiles(rows: TeamMessageRow[]): Promise<TeamMessage[]> {
   const senderIds = collectUniqueSenderIds(rows);
-  const nameBySenderId = await fetchSenderNamesByUserIds(senderIds);
-  return rowsToMessages(rows, nameBySenderId);
+  const profileBySenderId = await fetchProfileMembersByUserIds(senderIds);
+  return rowsToMessages(rows, profileBySenderId);
 }
 
 export async function listAccessibleTeamMessageThreads(
@@ -179,7 +172,11 @@ export async function listDirectMessageThreads(
     throw new Error(error.message);
   }
 
-  return ((data ?? []) as DirectMessageThreadWithUnreadRow[]).map(rowToDirectThreadWithUnread);
+  const threads = ((data ?? []) as DirectMessageThreadWithUnreadRow[]).map(
+    rowToDirectThreadWithUnread,
+  );
+
+  return enrichDirectThreadsWithOtherUserAvatars(threads);
 }
 
 export async function listDmEligibleMembers(teamId: string): Promise<DirectMessageEligibleMember[]> {
@@ -249,7 +246,7 @@ export async function fetchTeamMessagesByThread(
     throw new Error(error.message);
   }
 
-  return enrichMessagesWithSenderNames((data ?? []) as TeamMessageRow[]);
+  return enrichMessagesWithSenderProfiles((data ?? []) as TeamMessageRow[]);
 }
 
 export async function markThreadRead(threadId: string, upToMessageId: string): Promise<void> {
@@ -311,7 +308,7 @@ export async function sendTeamMessage(
     throw new Error(error.message);
   }
 
-  const [message] = await enrichMessagesWithSenderNames([data as TeamMessageRow]);
+  const [message] = await enrichMessagesWithSenderProfiles([data as TeamMessageRow]);
   return message;
 }
 

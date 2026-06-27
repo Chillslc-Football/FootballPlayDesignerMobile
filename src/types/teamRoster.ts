@@ -21,6 +21,7 @@ export type TeamManagementMemberRecord = {
   display_name: string | null;
   email: string | null;
   phone: string | null;
+  avatar_url: string | null;
 };
 
 export type TeamManagementRosterStatus = 'Active' | InviteDisplayStatus;
@@ -37,6 +38,7 @@ export type TeamManagementMemberRosterRow = TeamManagementRosterRowBase & {
   role: TeamRole;
   status: 'Active';
   phone: string | null;
+  avatar_url: string | null;
 };
 
 export type TeamManagementInviteRosterRow = TeamManagementRosterRowBase & {

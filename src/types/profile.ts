@@ -9,6 +9,7 @@ export type ProfileMemberFields = {
   display_name: string | null;
   email: string | null;
   phone: string | null;
+  avatar_url: string | null;
 };
 
 export type UserProfile = {

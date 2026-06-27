@@ -46,6 +46,7 @@ export function buildTeamManagementRosterRows(
       name: member.display_name?.trim() || null,
       email: member.email?.trim() || null,
       phone: member.phone?.trim() || null,
+      avatar_url: member.avatar_url?.trim() || null,
       role: member.role,
       status: 'Active' as const,
     }));

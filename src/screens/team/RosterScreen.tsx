@@ -13,6 +13,7 @@ import { RosterPlayerCard } from '../../components/roster/RosterPlayerCard';
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { useAppTheme } from '../../design-system';
 import { radius, spacing, typography } from '../../design-system';
+import { useAvatarSignedUrlMap } from '../../hooks/useAvatarSignedUrlMap';
 import { fetchTeamRoster } from '../../lib/teamRepository';
 import { MoreStackParamList } from '../../navigation/MoreStack';
 import { useTeam } from '../../team/TeamProvider';
@@ -78,6 +79,12 @@ export function RosterScreen({ navigation }: Props) {
     () => filterPlayersBySearch(players, searchQuery),
     [players, searchQuery],
   );
+
+  const playerAvatarPaths = useMemo(
+    () => players.map((player) => player.avatar_url),
+    [players],
+  );
+  const { signedUrlsByPath } = useAvatarSignedUrlMap(playerAvatarPaths);
 
   const styles = useMemo(
     () =>
@@ -178,6 +185,11 @@ export function RosterScreen({ navigation }: Props) {
               <RosterPlayerCard
                 key={player.user_id}
                 player={player}
+                signedUrl={
+                  player.avatar_url
+                    ? (signedUrlsByPath.get(player.avatar_url) ?? null)
+                    : null
+                }
                 isLast={index === filteredPlayers.length - 1}
                 onPress={() => {
                   navigation.navigate('RosterPlayerDetail', {

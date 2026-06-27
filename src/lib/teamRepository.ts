@@ -550,6 +550,33 @@ export async function removeTeamMember(teamId: string, userId: string): Promise<
   }
 }
 
+export async function deleteTeam(
+  teamId: string,
+  _context?: { role?: string | null },
+): Promise<void> {
+  const { error } = await supabase.rpc('delete_team', { p_team_id: teamId });
+
+  if (error) {
+    const details = [
+      error.message,
+      error.code ? `code=${error.code}` : null,
+      error.hint ? `hint=${error.hint}` : null,
+    ]
+      .filter(Boolean)
+      .join(' — ');
+
+    throw new Error(details);
+  }
+
+  const remainingTeam = await fetchTeamById(teamId);
+
+  if (remainingTeam) {
+    throw new Error(
+      'Team was not deleted from the database. Contact support if this continues.',
+    );
+  }
+}
+
 export async function fetchProfileDisplayName(userId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from('profiles')

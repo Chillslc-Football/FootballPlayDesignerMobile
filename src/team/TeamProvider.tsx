@@ -10,6 +10,7 @@ import {
 
 import {
   createTeam as createTeamRecord,
+  deleteTeam as deleteTeamRecord,
   fetchUserTeamMemberships,
   updateLastTeamId,
 } from '../lib/teamRepository';
@@ -22,6 +23,10 @@ type CreateTeamResult = {
   teamId: string | null;
 };
 
+type DeleteTeamResult = {
+  error: string | null;
+};
+
 type TeamContextValue = {
   memberships: TeamMembership[];
   selectedTeam: Team | null;
@@ -32,6 +37,7 @@ type TeamContextValue = {
   switchTeam: () => void;
   refreshTeams: () => Promise<void>;
   createTeam: (name: string, format: TeamFormat) => Promise<CreateTeamResult>;
+  deleteTeam: (teamId: string) => Promise<DeleteTeamResult>;
 };
 
 const TeamContext = createContext<TeamContextValue | undefined>(undefined);
@@ -172,6 +178,85 @@ export function TeamProvider({ children }: TeamProviderProps) {
     [refreshTeams, user],
   );
 
+  const deleteTeam = useCallback(
+    async (teamId: string): Promise<DeleteTeamResult> => {
+      if (!user) {
+        return { error: 'Not signed in' };
+      }
+
+      if (selectedTeamMemberRole !== 'team_owner') {
+        return { error: 'Only team owners can delete teams' };
+      }
+
+      if (!selectedTeam || teamId !== selectedTeam.id) {
+        return { error: 'You can only delete the active team' };
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        await deleteTeamRecord(teamId, { role: selectedTeamMemberRole });
+
+        const { memberships: loadedMemberships, lastTeamId } = await fetchUserTeamMemberships(
+          user.id,
+        );
+
+        if (loadedMemberships.some((membership) => membership.team.id === teamId)) {
+          throw new Error(
+            'Team delete appeared to succeed but the team is still in your memberships.',
+          );
+        }
+
+        setMemberships(loadedMemberships);
+
+        const preferredMembership = lastTeamId
+          ? loadedMemberships.find((membership) => membership.team.id === lastTeamId)
+          : undefined;
+
+        const nextMembership =
+          preferredMembership ??
+          loadedMemberships[0] ??
+          null;
+
+        if (nextMembership) {
+          setSelectedTeam(nextMembership.team);
+          setSelectedTeamMemberRole(nextMembership.role);
+
+          try {
+            await updateLastTeamId(user.id, nextMembership.team.id);
+          } catch (updateError) {
+            const message =
+              updateError instanceof Error
+                ? updateError.message
+                : 'Failed to save team selection after delete.';
+            setError(message);
+          }
+        } else {
+          setSelectedTeam(null);
+          setSelectedTeamMemberRole(null);
+        }
+
+        return { error: null };
+      } catch (deleteError) {
+        const message =
+          deleteError instanceof Error ? deleteError.message : 'Could not delete team.';
+
+        try {
+          await refreshTeams();
+        } catch {
+          // Keep the original delete error visible.
+        }
+
+        setError(message);
+        return { error: message };
+      } finally {
+        setLoading(false);
+      }
+    },
+    [refreshTeams, selectedTeam, selectedTeamMemberRole, user],
+  );
+
   const value = useMemo(
     () => ({
       memberships,
@@ -183,6 +268,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
       switchTeam,
       refreshTeams,
       createTeam,
+      deleteTeam,
     }),
     [
       memberships,
@@ -194,6 +280,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
       switchTeam,
       refreshTeams,
       createTeam,
+      deleteTeam,
     ],
   );
 

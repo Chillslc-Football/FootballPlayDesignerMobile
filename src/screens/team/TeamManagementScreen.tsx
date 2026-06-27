@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -9,12 +9,14 @@ import { MenuItem } from '../../components/MenuItem';
 import { MoreMenuSection } from '../../components/MoreMenuSection';
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { TeamManagementComingSoonItem } from '../../components/team/TeamManagementComingSoonItem';
+import { DeleteTeamDialog } from '../../components/team/DeleteTeamDialog';
 import { TeamManagementRosterItem } from '../../components/team/TeamManagementRosterItem';
-import { typography } from '../../design-system';
+import { buttonPresets, spacing, typography } from '../../design-system';
 import { useAppTheme } from '../../design-system/AppThemeProvider';
 import { fetchTeamManagementRoster } from '../../lib/teamManagementRepository';
 import { fetchProfileDisplayName, removeTeamMember } from '../../lib/teamRepository';
 import { MoreStackParamList } from '../../navigation/MoreStack';
+import { navigateToTab } from '../../navigation/navigationRef';
 import { useTeam } from '../../team/TeamProvider';
 import type { TeamManagementMemberRosterRow, TeamManagementRosterRow } from '../../types/teamRoster';
 import { canEditPlayMetadata } from '../../utils/canEditPlayMetadata';
@@ -66,7 +68,8 @@ function OverviewRow({ label, value }: OverviewRowProps) {
 
 export function TeamManagementScreen({ navigation }: Props) {
   const { user } = useAuth();
-  const { selectedTeam, selectedTeamMemberRole, loading, error } = useTeam();
+  const { selectedTeam, selectedTeamMemberRole, memberships, loading, error, deleteTeam } =
+    useTeam();
   const { palette, cardPresets } = useAppTheme();
   const [profileLabel, setProfileLabel] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -76,10 +79,14 @@ export function TeamManagementScreen({ navigation }: Props) {
   const [memberActionMessage, setMemberActionMessage] = useState<string | null>(null);
   const [memberActionError, setMemberActionError] = useState<string | null>(null);
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
+  const [deleteTeamOpen, setDeleteTeamOpen] = useState(false);
+  const [deleteTeamError, setDeleteTeamError] = useState<string | null>(null);
+  const [deletingTeam, setDeletingTeam] = useState(false);
   const hasLoadedRosterRef = useRef(false);
 
   const canManageTeam = canEditPlayMetadata(selectedTeamMemberRole);
   const isTeamOwner = selectedTeamMemberRole === 'team_owner';
+  const isLastTeam = memberships.length <= 1;
 
   const loadRoster = useCallback(async (teamId: string, background = false) => {
     if (!background) {
@@ -206,6 +213,26 @@ export function TeamManagementScreen({ navigation }: Props) {
           paddingHorizontal: 16,
           paddingTop: 16,
         },
+        dangerZoneCard: {
+          ...cardPresets.default.container,
+          marginBottom: 0,
+          borderColor: palette.status.error,
+          borderWidth: 1,
+          gap: spacing.md,
+        },
+        dangerZoneTitle: {
+          ...typography.subheading,
+          fontWeight: typography.heading.fontWeight,
+          color: palette.status.error,
+        },
+        dangerZoneDescription: {
+          ...typography.bodySmall,
+          color: palette.text.secondary,
+          lineHeight: 22,
+        },
+        deleteTeamButton: buttonPresets.danger.container,
+        deleteTeamButtonText: buttonPresets.danger.text,
+        deleteTeamButtonPressed: buttonPresets.danger.pressed,
       }),
     [cardPresets, palette],
   );
@@ -262,6 +289,39 @@ export function TeamManagementScreen({ navigation }: Props) {
     );
   };
 
+  const handleDeleteTeamClick = () => {
+    if (!isTeamOwner || !selectedTeam) {
+      return;
+    }
+
+    setDeleteTeamError(null);
+    setDeleteTeamOpen(true);
+  };
+
+  const handleConfirmDeleteTeam = () => {
+    if (!selectedTeam || !isTeamOwner || deletingTeam) {
+      return;
+    }
+
+    void (async () => {
+      setDeletingTeam(true);
+      setDeleteTeamError(null);
+
+      const result = await deleteTeam(selectedTeam.id);
+
+      setDeletingTeam(false);
+
+      if (result.error) {
+        setDeleteTeamError(result.error);
+        return;
+      }
+
+      setDeleteTeamOpen(false);
+      navigation.popToTop();
+      navigateToTab('Home');
+    })();
+  };
+
   if (loading) {
     return (
       <ScreenContainer title="Team Management" scrollable={false}>
@@ -312,20 +372,29 @@ export function TeamManagementScreen({ navigation }: Props) {
       icon: '⚙️',
       description: 'Update team details',
     },
-    ...(isTeamOwner
-      ? [
-          {
-            key: 'danger-zone',
-            label: 'Danger Zone',
-            icon: '⚠️',
-            description: 'Delete team and related data',
-          },
-        ]
-      : []),
   ];
 
   return (
     <ScreenContainer title="Team Management">
+      {isTeamOwner && selectedTeam ? (
+        <DeleteTeamDialog
+          visible={deleteTeamOpen}
+          teamName={selectedTeam.name}
+          isLastTeam={isLastTeam}
+          deleting={deletingTeam}
+          error={deleteTeamError}
+          onConfirm={handleConfirmDeleteTeam}
+          onCancel={() => {
+            if (deletingTeam) {
+              return;
+            }
+
+            setDeleteTeamOpen(false);
+            setDeleteTeamError(null);
+          }}
+        />
+      ) : null}
+
       <View style={styles.content}>
         <Card title="Team Overview">
           <View style={styles.overviewBody}>
@@ -420,6 +489,26 @@ export function TeamManagementScreen({ navigation }: Props) {
             ))}
           </MoreMenuSection>
         )}
+
+        {isTeamOwner ? (
+          <View style={styles.dangerZoneCard}>
+            <Text style={styles.dangerZoneTitle}>Danger Zone</Text>
+            <Text style={styles.dangerZoneDescription}>
+              Permanently delete this team and all of its plays, formations, members, and invites.
+              Plays and formations will be archived for import into future teams. Team members will
+              lose access.
+            </Text>
+            <Pressable
+              style={({ pressed }) => [
+                styles.deleteTeamButton,
+                pressed && styles.deleteTeamButtonPressed,
+              ]}
+              onPress={handleDeleteTeamClick}
+            >
+              <Text style={styles.deleteTeamButtonText}>Delete Team</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
     </ScreenContainer>
   );

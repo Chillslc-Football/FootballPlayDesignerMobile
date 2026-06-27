@@ -5,6 +5,7 @@ import { PushDebugScreen } from '../screens/PushDebugScreen';
 import { MoreScreen } from '../screens/MoreScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { InviteMembersScreen } from '../screens/team/InviteMembersScreen';
+import { JoinLinksScreen } from '../screens/team/JoinLinksScreen';
 import { RosterPlayerDetailScreen } from '../screens/team/RosterPlayerDetailScreen';
 import { RosterPlayerEditScreen } from '../screens/team/RosterPlayerEditScreen';
 import { RosterScreen } from '../screens/team/RosterScreen';
@@ -28,6 +29,7 @@ export type MoreStackParamList = {
   };
   TeamManagement: undefined;
   InviteMembers: undefined;
+  JoinLinks: undefined;
   PushDebug: undefined;
 };
 
@@ -61,6 +63,11 @@ export function MoreStack() {
         name="InviteMembers"
         component={InviteMembersScreen}
         options={{ title: 'Invite Members' }}
+      />
+      <Stack.Screen
+        name="JoinLinks"
+        component={JoinLinksScreen}
+        options={{ title: 'Join Links' }}
       />
       <Stack.Screen name="PushDebug" component={PushDebugScreen} options={{ title: 'Push Debug' }} />
     </Stack.Navigator>

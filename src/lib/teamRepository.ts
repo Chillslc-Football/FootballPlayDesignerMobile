@@ -5,6 +5,7 @@ import {
   type TeamMemberPlayerInfoUpdate,
 } from '../types/playerPosition';
 import type { Team, TeamMembership, TeamRole, TeamRosterMember } from '../types/team';
+import { isTeamFormat } from '../types/teamFormat';
 import { resolveProfileDisplayName } from '../utils/profileDisplay';
 import { mapRosterMemberPlayerInfo } from '../utils/rosterDisplay';
 
@@ -18,7 +19,16 @@ function normalizeTeam(value: Team | Team[] | null): Team | null {
     return null;
   }
 
-  return Array.isArray(value) ? (value[0] ?? null) : value;
+  const team = Array.isArray(value) ? (value[0] ?? null) : value;
+
+  if (!team) {
+    return null;
+  }
+
+  return {
+    ...team,
+    team_format: isTeamFormat(team.team_format) ? team.team_format : null,
+  };
 }
 
 export async function fetchUserTeamMemberships(userId: string): Promise<{
@@ -28,7 +38,7 @@ export async function fetchUserTeamMemberships(userId: string): Promise<{
   const [membershipResult, profileResult] = await Promise.all([
     supabase
       .from('team_members')
-      .select('role, teams(id, name, created_by, created_at)')
+      .select('role, teams(id, name, created_by, created_at, team_format)')
       .eq('user_id', userId),
     supabase.from('profiles').select('last_team_id').eq('id', userId).maybeSingle(),
   ]);
@@ -150,6 +160,17 @@ export async function updateTeamMemberPlayerInfo(
 
   if (!data) {
     throw new Error('Player record was not updated.');
+  }
+}
+
+export async function removeTeamMember(teamId: string, userId: string): Promise<void> {
+  const { error } = await supabase.rpc('remove_team_member', {
+    p_team_id: teamId,
+    p_user_id: userId,
+  });
+
+  if (error) {
+    throw new Error(error.message);
   }
 }
 

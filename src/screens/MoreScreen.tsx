@@ -72,6 +72,12 @@ export function MoreScreen({ navigation }: Props) {
 
   const teamRows = [
     <MenuItem
+      key="create-team"
+      label="Create New Team"
+      icon="➕"
+      onPress={() => navigation.navigate('CreateTeam')}
+    />,
+    <MenuItem
       key="roster"
       label="Roster"
       icon="👥"

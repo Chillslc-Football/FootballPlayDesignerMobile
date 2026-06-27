@@ -8,9 +8,19 @@ import {
   useState,
 } from 'react';
 
-import { fetchUserTeamMemberships, updateLastTeamId } from '../lib/teamRepository';
+import {
+  createTeam as createTeamRecord,
+  fetchUserTeamMemberships,
+  updateLastTeamId,
+} from '../lib/teamRepository';
 import type { Team, TeamMembership, TeamRole } from '../types/team';
+import type { TeamFormat } from '../types/teamFormat';
 import { useAuth } from '../auth/AuthProvider';
+
+type CreateTeamResult = {
+  error: string | null;
+  teamId: string | null;
+};
 
 type TeamContextValue = {
   memberships: TeamMembership[];
@@ -21,6 +31,7 @@ type TeamContextValue = {
   selectTeam: (teamId: string) => Promise<void>;
   switchTeam: () => void;
   refreshTeams: () => Promise<void>;
+  createTeam: (name: string, format: TeamFormat) => Promise<CreateTeamResult>;
 };
 
 const TeamContext = createContext<TeamContextValue | undefined>(undefined);
@@ -112,6 +123,55 @@ export function TeamProvider({ children }: TeamProviderProps) {
     setError(null);
   }, []);
 
+  const createTeam = useCallback(
+    async (name: string, format: TeamFormat): Promise<CreateTeamResult> => {
+      if (!user) {
+        return { error: 'Not signed in', teamId: null };
+      }
+
+      const trimmed = name.trim();
+      if (trimmed.length < 2) {
+        return { error: 'Team name must be at least 2 characters.', teamId: null };
+      }
+
+      setError(null);
+
+      try {
+        const membership = await createTeamRecord(user.id, trimmed, format);
+
+        const { memberships: loadedMemberships } = await fetchUserTeamMemberships(user.id);
+        const activeMembership = loadedMemberships.find(
+          (item) => item.team.id === membership.team.id,
+        );
+
+        if (!activeMembership) {
+          throw new Error(
+            `public.teams row for id "${membership.team.id}" was not returned by membership refresh after create.`,
+          );
+        }
+
+        setMemberships(loadedMemberships);
+        setSelectedTeam(activeMembership.team);
+        setSelectedTeamMemberRole(activeMembership.role);
+
+        return { error: null, teamId: activeMembership.team.id };
+      } catch (createError) {
+        const message =
+          createError instanceof Error ? createError.message : 'Could not create team.';
+
+        try {
+          await refreshTeams();
+        } catch {
+          // Keep the original create error visible.
+        }
+
+        setError(message);
+        return { error: message, teamId: null };
+      }
+    },
+    [refreshTeams, user],
+  );
+
   const value = useMemo(
     () => ({
       memberships,
@@ -122,6 +182,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
       selectTeam,
       switchTeam,
       refreshTeams,
+      createTeam,
     }),
     [
       memberships,
@@ -132,6 +193,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
       selectTeam,
       switchTeam,
       refreshTeams,
+      createTeam,
     ],
   );
 

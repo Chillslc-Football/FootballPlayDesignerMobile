@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '../auth/AuthProvider';
+import { CreateTeamForm } from '../components/team/CreateTeamForm';
 import { PlaybookList } from '../components/PlaybookList';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { useTeam } from '../team/TeamProvider';
@@ -13,6 +14,7 @@ export function TeamSelectorScreen() {
   const { memberships, loading, error, selectTeam } = useTeam();
   const [selectingTeamId, setSelectingTeamId] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   const handleSelectTeam = async (teamId: string) => {
     setSelectingTeamId(teamId);
@@ -39,6 +41,30 @@ export function TeamSelectorScreen() {
     );
   }
 
+  if (showCreateForm) {
+    return (
+      <ScreenContainer title="Create New Team">
+        <CreateTeamForm
+          onCreated={(teamName) => {
+            Alert.alert('Team created', `"${teamName}" is ready to use.`);
+          }}
+        />
+        <View style={styles.createFormFooter}>
+          <PlaybookList
+            items={[
+              {
+                key: 'back-to-team-select',
+                label: 'Back to Team Select',
+                icon: '↩️',
+                onPress: () => setShowCreateForm(false),
+              },
+            ]}
+          />
+        </View>
+      </ScreenContainer>
+    );
+  }
+
   return (
     <ScreenContainer title="Select Team" subtitle="Choose the team you want to work with">
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -60,6 +86,19 @@ export function TeamSelectorScreen() {
           }))}
         />
       )}
+
+      <View style={styles.createTeamContainer}>
+        <PlaybookList
+          items={[
+            {
+              key: 'create-team',
+              label: 'Create New Team',
+              icon: '➕',
+              onPress: () => setShowCreateForm(true),
+            },
+          ]}
+        />
+      </View>
 
       {selectingTeamId ? (
         <View style={styles.loadingOverlay}>
@@ -113,6 +152,12 @@ const styles = StyleSheet.create({
   loadingOverlay: {
     marginTop: 16,
     alignItems: 'center',
+  },
+  createTeamContainer: {
+    marginTop: 24,
+  },
+  createFormFooter: {
+    marginTop: 24,
   },
   signOutContainer: {
     marginTop: 24,

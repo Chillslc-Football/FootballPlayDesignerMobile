@@ -283,10 +283,20 @@ export function TeamManagementScreen({ navigation }: Props) {
   if (!selectedTeam) {
     return (
       <ScreenContainer title="Team Management">
-        <View style={styles.noticeCard}>
-          <Text style={styles.emptyText}>
-            Select a team from More → Account → Switch Team to view team management.
-          </Text>
+        <View style={styles.content}>
+          <View style={styles.noticeCard}>
+            <Text style={styles.emptyText}>
+              Select a team from More → Account → Switch Team to view team management.
+            </Text>
+          </View>
+          <MoreMenuSection title="Team">
+            <MenuItem
+              label="Create New Team"
+              icon="➕"
+              onPress={() => navigation.navigate('CreateTeam')}
+              isLast
+            />
+          </MoreMenuSection>
         </View>
       </ScreenContainer>
     );
@@ -325,6 +335,15 @@ export function TeamManagementScreen({ navigation }: Props) {
             <OverviewRow label="You" value={userLabel} />
           </View>
         </Card>
+
+        <MoreMenuSection title="Team">
+          <MenuItem
+            label="Create New Team"
+            icon="➕"
+            onPress={() => navigation.navigate('CreateTeam')}
+            isLast={!canManageTeam}
+          />
+        </MoreMenuSection>
 
         <MoreMenuSection title="Members">
           {memberActionMessage ? (

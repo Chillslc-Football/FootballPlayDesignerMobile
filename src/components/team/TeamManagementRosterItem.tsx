@@ -10,6 +10,7 @@ import {
   getTeamManagementSecondaryEmail,
 } from '../../utils/teamManagementRoster';
 import { ProfileInitialsAvatar } from '../roster/ProfileInitialsAvatar';
+import { PhoneActions } from '../phone/PhoneActions';
 import { getRosterPlayerInitials } from '../../utils/rosterDisplay';
 
 type TeamManagementRosterItemProps = {
@@ -66,6 +67,7 @@ export function TeamManagementRosterItem({
   const roleLabel = formatTeamManagementRoleLabel(row.role);
   const statusColors = getStatusColors(row.status, palette);
   const showRemove = canRemove && row.kind === 'member' && onRemove;
+  const memberPhone = row.kind === 'member' ? row.phone : null;
 
   const styles = useMemo(
     () =>
@@ -105,6 +107,11 @@ export function TeamManagementRosterItem({
         role: {
           ...typography.caption,
           color: palette.text.secondary,
+        },
+        phone: {
+          ...typography.caption,
+          color: palette.text.secondary,
+          marginTop: spacing.xs,
         },
         statusBadge: {
           borderRadius: 999,
@@ -154,6 +161,8 @@ export function TeamManagementRosterItem({
             <Text style={[styles.statusText, { color: statusColors.color }]}>{row.status}</Text>
           </View>
         </View>
+        {memberPhone ? <Text style={styles.phone}>{memberPhone}</Text> : null}
+        <PhoneActions phone={memberPhone} />
       </View>
       {showRemove ? (
         <Pressable

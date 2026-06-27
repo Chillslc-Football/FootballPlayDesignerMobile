@@ -11,6 +11,7 @@ import {
   getRosterPlayerLabel,
 } from '../../utils/rosterDisplay';
 import { ProfileInitialsAvatar } from './ProfileInitialsAvatar';
+import { PhoneActions } from '../phone/PhoneActions';
 
 type RosterPlayerCardProps = {
   player: TeamRosterMember;
@@ -26,6 +27,7 @@ export function RosterPlayerCard({ player, onPress, isLast = false }: RosterPlay
     player.primary_position,
     player.secondary_position,
   );
+  const phone = player.phone?.trim() || null;
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -63,6 +65,11 @@ export function RosterPlayerCard({ player, onPress, isLast = false }: RosterPlay
           color: palette.text.secondary,
           marginTop: spacing.xs,
         },
+        phone: {
+          ...typography.caption,
+          color: palette.text.secondary,
+          marginTop: spacing.xs,
+        },
         chevron: {
           fontSize: 22,
           color: colors.textMuted,
@@ -86,6 +93,8 @@ export function RosterPlayerCard({ player, onPress, isLast = false }: RosterPlay
         {jerseyLabel ? <Text style={styles.jersey}>{jerseyLabel}</Text> : null}
         <Text style={styles.name}>{label}</Text>
         {positionLine ? <Text style={styles.positions}>{positionLine}</Text> : null}
+        {phone ? <Text style={styles.phone}>{phone}</Text> : null}
+        <PhoneActions phone={phone} />
       </View>
       <Text style={styles.chevron}>›</Text>
     </Pressable>

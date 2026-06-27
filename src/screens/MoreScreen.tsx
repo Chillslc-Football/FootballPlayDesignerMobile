@@ -9,7 +9,6 @@ import { ScreenContainer } from '../components/ScreenContainer';
 import { useAppTheme } from '../design-system';
 import { MoreStackParamList } from '../navigation/MoreStack';
 import { useTeam } from '../team/TeamProvider';
-import { canEditPlayMetadata } from '../utils/canEditPlayMetadata';
 import { formatTeamRole } from '../utils/roleLabels';
 
 type Props = NativeStackScreenProps<MoreStackParamList, 'MoreMenu'>;
@@ -19,8 +18,6 @@ export function MoreScreen({ navigation }: Props) {
   const { selectedTeam, selectedTeamMemberRole, switchTeam } = useTeam();
   const { colors } = useAppTheme();
   const [signingOut, setSigningOut] = useState(false);
-
-  const canManageTeam = canEditPlayMetadata(selectedTeamMemberRole);
 
   const styles = useMemo(
     () =>
@@ -70,39 +67,6 @@ export function MoreScreen({ navigation }: Props) {
     }
   };
 
-  const teamRows = [
-    <MenuItem
-      key="create-team"
-      label="Create New Team"
-      icon="➕"
-      onPress={() => navigation.navigate('CreateTeam')}
-    />,
-    <MenuItem
-      key="roster"
-      label="Roster"
-      icon="👥"
-      onPress={() => navigation.navigate('Roster')}
-      isLast={!canManageTeam}
-    />,
-    ...(canManageTeam
-      ? [
-          <MenuItem
-            key="team-management"
-            label="Team Management"
-            icon="🛡️"
-            onPress={() => navigation.navigate('TeamManagement')}
-          />,
-          <MenuItem
-            key="invite-members"
-            label="Invite Members"
-            icon="✉️"
-            onPress={() => navigation.navigate('InviteMembers')}
-            isLast
-          />,
-        ]
-      : []),
-  ];
-
   return (
     <ScreenContainer title="More">
       <View style={styles.content}>
@@ -116,7 +80,19 @@ export function MoreScreen({ navigation }: Props) {
           </View>
         ) : null}
 
-        <MoreMenuSection title="Team">{teamRows}</MoreMenuSection>
+        <MoreMenuSection title="Team">
+          <MenuItem
+            label="Team Management"
+            icon="🛡️"
+            onPress={() => navigation.navigate('TeamManagement')}
+          />
+          <MenuItem
+            label="Create New Team"
+            icon="➕"
+            onPress={() => navigation.navigate('CreateTeam')}
+            isLast
+          />
+        </MoreMenuSection>
 
         <MoreMenuSection title="Settings">
           <MenuItem
@@ -133,12 +109,12 @@ export function MoreScreen({ navigation }: Props) {
         </MoreMenuSection>
 
         <MoreMenuSection title="Account">
-          <MenuItem label="Switch Team" icon="🔁" onPress={switchTeam} />
           <MenuItem
-            label="Push Debug"
-            icon="🛠️"
-            onPress={() => navigation.navigate('PushDebug')}
+            label="Profile"
+            icon="👤"
+            onPress={() => navigation.navigate('Profile')}
           />
+          <MenuItem label="Switch Team" icon="🔁" onPress={switchTeam} />
           <MenuItem
             label={signingOut ? 'Signing Out...' : 'Sign Out'}
             icon="🚪"
@@ -146,6 +122,17 @@ export function MoreScreen({ navigation }: Props) {
             isLast
           />
         </MoreMenuSection>
+
+        {__DEV__ ? (
+          <MoreMenuSection title="Developer">
+            <MenuItem
+              label="Push Debug"
+              icon="🛠️"
+              onPress={() => navigation.navigate('PushDebug')}
+              isLast
+            />
+          </MoreMenuSection>
+        ) : null}
       </View>
 
       {signingOut ? (

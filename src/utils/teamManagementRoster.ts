@@ -45,6 +45,7 @@ export function buildTeamManagementRosterRows(
       user_id: member.user_id,
       name: member.display_name?.trim() || null,
       email: member.email?.trim() || null,
+      phone: member.phone?.trim() || null,
       role: member.role,
       status: 'Active' as const,
     }));
@@ -138,4 +139,46 @@ export function getTeamManagementSecondaryEmail(row: TeamManagementRosterRow): s
   }
 
   return row.email;
+}
+
+export function getTeamManagementRosterCounts(rows: TeamManagementRosterRow[]): {
+  active: number;
+  pending: number;
+} {
+  let active = 0;
+  let pending = 0;
+
+  for (const row of rows) {
+    if (row.kind === 'member') {
+      active += 1;
+      continue;
+    }
+
+    if (row.status === 'Pending') {
+      pending += 1;
+    }
+  }
+
+  return { active, pending };
+}
+
+export function formatTeamManagementMemberSummary(
+  rows: TeamManagementRosterRow[],
+  loading: boolean,
+): string {
+  if (loading) {
+    return 'Loading…';
+  }
+
+  const { active, pending } = getTeamManagementRosterCounts(rows);
+
+  if (active === 0 && pending === 0) {
+    return 'No members yet';
+  }
+
+  if (pending > 0) {
+    return `${active} active • ${pending} pending`;
+  }
+
+  return `${active} ${active === 1 ? 'member' : 'members'}`;
 }

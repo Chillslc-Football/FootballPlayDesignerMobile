@@ -34,6 +34,13 @@ export default {
           defaultChannel: 'default',
         },
       ],
+      [
+        'expo-image-picker',
+        {
+          photosPermission:
+            'Allow Football Play Designer to access your photos to set your profile picture.',
+        },
+      ],
       '@react-native-community/datetimepicker',
     ],
     web: {

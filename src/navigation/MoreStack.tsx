@@ -1,6 +1,7 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { AppearanceScreen } from '../screens/AppearanceScreen';
+import { ProfileScreen } from '../screens/ProfileScreen';
 import { PushDebugScreen } from '../screens/PushDebugScreen';
 import { MoreScreen } from '../screens/MoreScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
@@ -10,11 +11,14 @@ import { JoinLinksScreen } from '../screens/team/JoinLinksScreen';
 import { RosterPlayerDetailScreen } from '../screens/team/RosterPlayerDetailScreen';
 import { RosterPlayerEditScreen } from '../screens/team/RosterPlayerEditScreen';
 import { RosterScreen } from '../screens/team/RosterScreen';
+import { TeamMembersScreen } from '../screens/team/TeamMembersScreen';
+import { TeamInformationScreen } from '../screens/team/TeamInformationScreen';
 import { TeamManagementScreen } from '../screens/team/TeamManagementScreen';
 import { useStackScreenOptions } from '../design-system';
 
 export type MoreStackParamList = {
   MoreMenu: undefined;
+  Profile: undefined;
   Settings: undefined;
   Appearance: undefined;
   Roster: undefined;
@@ -29,6 +33,8 @@ export type MoreStackParamList = {
     secondaryPosition: string | null;
   };
   TeamManagement: undefined;
+  TeamMembers: undefined;
+  TeamInformation: undefined;
   InviteMembers: undefined;
   JoinLinks: undefined;
   CreateTeam: undefined;
@@ -43,6 +49,7 @@ export function MoreStack() {
   return (
     <Stack.Navigator screenOptions={stackScreenOptions}>
       <Stack.Screen name="MoreMenu" component={MoreScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Notifications' }} />
       <Stack.Screen name="Appearance" component={AppearanceScreen} options={{ title: 'Appearance' }} />
       <Stack.Screen name="Roster" component={RosterScreen} options={{ title: 'Roster' }} />
@@ -60,6 +67,12 @@ export function MoreStack() {
         name="TeamManagement"
         component={TeamManagementScreen}
         options={{ title: 'Team Management' }}
+      />
+      <Stack.Screen name="TeamMembers" component={TeamMembersScreen} options={{ title: 'Members' }} />
+      <Stack.Screen
+        name="TeamInformation"
+        component={TeamInformationScreen}
+        options={{ title: 'Team Information' }}
       />
       <Stack.Screen
         name="InviteMembers"

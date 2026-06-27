@@ -1,5 +1,5 @@
+import { fetchProfileMembersByUserIds } from './profileRepository';
 import { supabase } from './supabase';
-import type { ProfileNameFields } from '../types/profile';
 import {
   buildTeamMemberPlayerInfoDbPayload,
   type TeamMemberPlayerInfoUpdate,
@@ -458,33 +458,6 @@ type TeamRosterMemberRow = {
   secondary_position: string | null;
 };
 
-type ProfileRow = ProfileNameFields & { id: string };
-
-async function fetchProfileNamesByUserIds(
-  userIds: string[],
-): Promise<Map<string, string | null>> {
-  const nameByUserId = new Map<string, string | null>();
-
-  if (userIds.length === 0) {
-    return nameByUserId;
-  }
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, display_name, email')
-    .in('id', userIds);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  for (const row of (data ?? []) as ProfileRow[]) {
-    nameByUserId.set(row.id, resolveProfileDisplayName(row));
-  }
-
-  return nameByUserId;
-}
-
 export async function fetchTeamRoster(teamId: string): Promise<TeamRosterMember[]> {
   const { data, error } = await supabase
     .from('team_members')
@@ -496,14 +469,20 @@ export async function fetchTeamRoster(teamId: string): Promise<TeamRosterMember[
   }
 
   const rows = (data ?? []) as TeamRosterMemberRow[];
-  const nameByUserId = await fetchProfileNamesByUserIds(rows.map((row) => row.user_id));
+  const profileByUserId = await fetchProfileMembersByUserIds(rows.map((row) => row.user_id));
 
-  const roster: TeamRosterMember[] = rows.map((row) => ({
-    user_id: row.user_id,
-    role: row.role,
-    display_name: nameByUserId.get(row.user_id) ?? null,
-    ...mapRosterMemberPlayerInfo(row),
-  }));
+  const roster: TeamRosterMember[] = rows.map((row) => {
+    const profile = profileByUserId.get(row.user_id);
+
+    return {
+      user_id: row.user_id,
+      role: row.role,
+      display_name: profile ? resolveProfileDisplayName(profile) : null,
+      email: profile?.email ?? null,
+      phone: profile?.phone ?? null,
+      ...mapRosterMemberPlayerInfo(row),
+    };
+  });
 
   roster.sort((left, right) => {
     const leftLabel = left.display_name ?? '';

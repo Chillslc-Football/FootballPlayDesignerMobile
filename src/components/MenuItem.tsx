@@ -6,11 +6,12 @@ import { useAppTheme } from '../design-system/AppThemeProvider';
 type MenuItemProps = {
   label: string;
   icon: string;
+  subtitle?: string;
   onPress?: () => void;
   isLast?: boolean;
 };
 
-export function MenuItem({ label, icon, onPress, isLast = false }: MenuItemProps) {
+export function MenuItem({ label, icon, subtitle, onPress, isLast = false }: MenuItemProps) {
   const { colors } = useAppTheme();
   const styles = useMemo(
     () =>
@@ -36,11 +37,18 @@ export function MenuItem({ label, icon, onPress, isLast = false }: MenuItemProps
         icon: {
           fontSize: 20,
         },
-        label: {
+        labelContainer: {
           flex: 1,
+          gap: 2,
+        },
+        label: {
           fontSize: 17,
           fontWeight: '500',
           color: colors.text,
+        },
+        subtitle: {
+          fontSize: 14,
+          color: colors.textSecondary,
         },
         chevron: {
           fontSize: 22,
@@ -63,7 +71,10 @@ export function MenuItem({ label, icon, onPress, isLast = false }: MenuItemProps
       <View style={styles.iconContainer}>
         <Text style={styles.icon}>{icon}</Text>
       </View>
-      <Text style={styles.label}>{label}</Text>
+      <View style={styles.labelContainer}>
+        <Text style={styles.label}>{label}</Text>
+        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      </View>
       <Text style={styles.chevron}>›</Text>
     </Pressable>
   );

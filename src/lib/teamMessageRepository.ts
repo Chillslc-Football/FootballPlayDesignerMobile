@@ -1,3 +1,4 @@
+import { PROFILE_MEMBER_COLUMNS } from './profileRepository';
 import { supabase } from './supabase';
 import { createSafeRealtimeUnsubscribe } from './realtimeChannelCleanup';
 import type { ProfileNameFields } from '../types/profile';
@@ -57,8 +58,6 @@ type ProfileRow = ProfileNameFields & {
 const MESSAGE_COLUMNS =
   'id, thread_id, team_id, sender_id, body, mention_audiences, created_at, edited_at, deleted_at';
 
-const PROFILE_NAME_COLUMNS = 'id, display_name, email';
-
 function parseUnreadCount(value: number | string | null | undefined): number {
   if (typeof value === 'number') {
     return value;
@@ -117,7 +116,7 @@ async function fetchSenderNamesByUserIds(
 
   const { data, error } = await supabase
     .from('profiles')
-    .select(PROFILE_NAME_COLUMNS)
+    .select(PROFILE_MEMBER_COLUMNS)
     .in('id', userIds);
 
   if (error) {

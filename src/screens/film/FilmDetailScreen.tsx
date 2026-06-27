@@ -14,17 +14,17 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Clipboard from 'expo-clipboard';
 
 import { palette, spacing, typography } from '../../design-system';
+import { FilmThumbnail } from '../../components/film/FilmThumbnail';
 import { deleteTeamFilm } from '../../lib/filmRepository';
 import { fetchProfileDisplayName } from '../../lib/teamRepository';
 import { FilmStackParamList } from '../../navigation/FilmStack';
 import { useTeam } from '../../team/TeamProvider';
 import { colors } from '../../theme';
-import { teamFilmToDraft } from '../../types/teamFilm';
+import { teamFilmToDraft, isUploadFilm } from '../../types/teamFilm';
 import { canEditPlayMetadata } from '../../utils/canEditPlayMetadata';
-import {
-  formatTeamFilmDate,
-  formatTeamFilmVideoSourceType,
-} from '../../utils/teamFilmDisplay';
+import { formatFilmProviderBadge, resolveFilmProvider } from '../../utils/filmProvider';
+import { isThumbnailSupported } from '../../utils/filmThumbnail';
+import { buildFilmSharePayload, formatTeamFilmDate } from '../../utils/teamFilmDisplay';
 
 type Props = NativeStackScreenProps<FilmStackParamList, 'FilmDetail'>;
 
@@ -39,6 +39,10 @@ export function FilmDetailScreen({ navigation, route }: Props) {
   const canManageFilm = canEditPlayMetadata(selectedTeamMemberRole);
   const notes = film.notes?.trim();
   const teamId = selectedTeam?.id ?? film.team_id;
+  const provider = resolveFilmProvider(film.video_source, film.video_source_type);
+  const providerBadge = formatFilmProviderBadge(provider);
+  const showThumbnail = isThumbnailSupported(provider);
+  const isUpload = isUploadFilm(film);
 
   useFocusEffect(
     useCallback(() => {
@@ -62,11 +66,8 @@ export function FilmDetailScreen({ navigation, route }: Props) {
 
   const handleShare = async () => {
     try {
-      await Share.share({
-        title: film.title,
-        message: `${film.title}\n${film.video_source}`,
-        url: film.video_source,
-      });
+      const payload = buildFilmSharePayload(film);
+      await Share.share(payload);
     } catch (shareError) {
       if (shareError instanceof Error && shareError.message.includes('User did not share')) {
         return;
@@ -94,6 +95,7 @@ export function FilmDetailScreen({ navigation, route }: Props) {
     navigation.navigate('FilmForm', {
       draft: teamFilmToDraft(film),
       editingExisting: true,
+      isUpload,
     });
   };
 
@@ -109,7 +111,7 @@ export function FilmDetailScreen({ navigation, route }: Props) {
             setError(null);
 
             try {
-              await deleteTeamFilm(teamId, film.id);
+              await deleteTeamFilm(teamId, film);
               navigation.popToTop();
             } catch (deleteError) {
               const message =
@@ -132,14 +134,29 @@ export function FilmDetailScreen({ navigation, route }: Props) {
     >
       <Text style={styles.title}>{film.title}</Text>
 
+      <Text style={styles.providerBadge}>{providerBadge}</Text>
+
+      {showThumbnail ? (
+        <FilmThumbnail
+          videoSource={film.video_source}
+          provider={provider}
+          height={140}
+          rounded
+        />
+      ) : null}
+
       <Pressable
         style={({ pressed }) => [styles.watchButton, pressed && styles.buttonPressed]}
         onPress={handleWatch}
         disabled={deleting}
       >
-        <Text style={styles.watchButtonText}>Watch Film</Text>
+        <Text style={styles.watchButtonText}>Open Film</Text>
       </Pressable>
-      <Text style={styles.watchNote}>Video opens in the provider app or browser.</Text>
+      <Text style={styles.watchNote}>
+        {isUpload
+          ? 'Uploaded film plays inside Winner\'s Choice.'
+          : 'Video opens in the provider app or browser.'}
+      </Text>
 
       {notes ? (
         <View style={styles.fieldBlock}>
@@ -158,13 +175,6 @@ export function FilmDetailScreen({ navigation, route }: Props) {
         <Text style={styles.fieldValue}>{formatTeamFilmDate(film.created_at)}</Text>
       </View>
 
-      <View style={styles.fieldBlock}>
-        <Text style={styles.fieldLabel}>Source</Text>
-        <Text style={styles.fieldValue}>
-          {formatTeamFilmVideoSourceType(film.video_source_type)}
-        </Text>
-      </View>
-
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <View style={styles.shareActions}>
@@ -176,15 +186,17 @@ export function FilmDetailScreen({ navigation, route }: Props) {
           <Text style={styles.secondaryButtonText}>Share</Text>
         </Pressable>
 
-        <Pressable
-          style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
-          onPress={handleCopyLink}
-          disabled={deleting}
-        >
-          <Text style={styles.secondaryButtonText}>
-            {copyConfirmed ? 'Link copied' : 'Copy Link'}
-          </Text>
-        </Pressable>
+        {!isUpload ? (
+          <Pressable
+            style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+            onPress={handleCopyLink}
+            disabled={deleting}
+          >
+            <Text style={styles.secondaryButtonText}>
+              {copyConfirmed ? 'Link copied' : 'Copy Link'}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {canManageFilm ? (
@@ -229,7 +241,13 @@ const styles = StyleSheet.create({
   title: {
     ...typography.heading,
     color: palette.text.primary,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  providerBadge: {
+    ...typography.subheading,
+    color: palette.text.secondary,
+    fontWeight: typography.subheading.fontWeight,
+    marginBottom: spacing.md,
   },
   watchButton: {
     backgroundColor: colors.accent,
@@ -238,6 +256,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
+    marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
   watchButtonText: {

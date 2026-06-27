@@ -1,13 +1,19 @@
-import type { TeamFilmVideoSourceType } from '../types/teamFilm';
+import type { TeamFilm, TeamFilmVideoSourceType } from '../types/teamFilm';
+import {
+  getFilmProviderLabel,
+  resolveFilmProvider,
+  type FilmProvider,
+} from './filmProvider';
 
-const VIDEO_SOURCE_TYPE_LABELS: Record<TeamFilmVideoSourceType, string> = {
-  youtube: 'YouTube',
-  hudl: 'Hudl',
-  google_drive: 'Google Drive',
-  dropbox: 'Dropbox',
-  upload: 'Upload',
-  external: 'External link',
-};
+export { getFilmProvider as detectVideoSourceType } from './filmProvider';
+export {
+  formatFilmProviderBadge,
+  getFilmProvider,
+  getFilmProviderIcon,
+  getFilmProviderLabel,
+  resolveFilmProvider,
+} from './filmProvider';
+export type { FilmProvider } from './filmProvider';
 
 export function formatTeamFilmDate(iso: string): string {
   const date = new Date(iso);
@@ -34,6 +40,35 @@ export function formatTeamFilmAddedDate(iso: string): string {
   });
 }
 
+export function formatTeamFilmRelativeAddedDate(iso: string): string {
+  const date = new Date(iso);
+
+  if (Number.isNaN(date.getTime())) {
+    return iso;
+  }
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfAddedDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayDiff = Math.round(
+    (startOfToday.getTime() - startOfAddedDay.getTime()) / (1000 * 60 * 60 * 24),
+  );
+
+  if (dayDiff === 0) {
+    return 'Today';
+  }
+
+  if (dayDiff === 1) {
+    return 'Yesterday';
+  }
+
+  if (dayDiff > 1 && dayDiff < 7) {
+    return date.toLocaleDateString(undefined, { weekday: 'long' });
+  }
+
+  return formatTeamFilmAddedDate(iso);
+}
+
 export function previewTeamFilmNotes(notes: string | null, maxLength = 80): string | null {
   if (!notes) {
     return null;
@@ -52,30 +87,15 @@ export function previewTeamFilmNotes(notes: string | null, maxLength = 80): stri
   return `${trimmed.slice(0, maxLength).trimEnd()}…`;
 }
 
-export function formatTeamFilmVideoSourceType(sourceType: TeamFilmVideoSourceType): string {
-  return VIDEO_SOURCE_TYPE_LABELS[sourceType] ?? VIDEO_SOURCE_TYPE_LABELS.external;
-}
+export function formatTeamFilmVideoSourceType(
+  sourceType: TeamFilmVideoSourceType,
+  videoSource?: string,
+): string {
+  const provider = videoSource
+    ? resolveFilmProvider(videoSource, sourceType)
+    : sourceType;
 
-export function detectVideoSourceType(url: string): TeamFilmVideoSourceType {
-  const lower = url.trim().toLowerCase();
-
-  if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
-    return 'youtube';
-  }
-
-  if (lower.includes('hudl.com')) {
-    return 'hudl';
-  }
-
-  if (lower.includes('drive.google.com') || lower.includes('docs.google.com')) {
-    return 'google_drive';
-  }
-
-  if (lower.includes('dropbox.com')) {
-    return 'dropbox';
-  }
-
-  return 'external';
+  return getFilmProviderLabel(provider as FilmProvider);
 }
 
 export function isValidExternalVideoUrl(url: string): boolean {
@@ -110,8 +130,29 @@ export function validateTeamFilmForm(input: {
   return null;
 }
 
-export function getBrowserOpenHint(sourceType: TeamFilmVideoSourceType): string | null {
-  switch (sourceType) {
+export function buildFilmSharePayload(film: TeamFilm): {
+  title: string;
+  message: string;
+  url?: string;
+} {
+  if (film.video_source_type === 'upload') {
+    return {
+      title: film.title,
+      message: `${film.title} — team film in Winner's Choice`,
+    };
+  }
+
+  return {
+    title: film.title,
+    message: `${film.title}\n${film.video_source}`,
+    url: film.video_source,
+  };
+}
+
+export function getBrowserOpenHint(provider: FilmProvider): string | null {
+  switch (provider) {
+    case 'upload':
+      return 'Uploaded team film plays inside Winner\'s Choice.';
     case 'youtube':
       return 'YouTube opens in the YouTube app or your browser.';
     case 'hudl':

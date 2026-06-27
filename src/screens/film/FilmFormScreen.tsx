@@ -26,7 +26,7 @@ import {
 type Props = NativeStackScreenProps<FilmStackParamList, 'FilmForm'>;
 
 export function FilmFormScreen({ navigation, route }: Props) {
-  const { draft, editingExisting } = route.params;
+  const { draft, editingExisting, isUpload = false } = route.params;
   const { user } = useAuth();
   const { selectedTeam } = useTeam();
 
@@ -37,12 +37,17 @@ export function FilmFormScreen({ navigation, route }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
-  const validationError = useMemo(
-    () => validateTeamFilmForm({ title, videoSource }),
-    [title, videoSource],
-  );
+  const validationError = useMemo(() => {
+    if (isUpload) {
+      return title.trim().length === 0 ? 'Title is required.' : null;
+    }
 
-  const requiredComplete = areRequiredTeamFilmFormFieldsComplete({ title, videoSource });
+    return validateTeamFilmForm({ title, videoSource });
+  }, [isUpload, title, videoSource]);
+
+  const requiredComplete = isUpload
+    ? title.trim().length > 0
+    : areRequiredTeamFilmFormFieldsComplete({ title, videoSource });
   const canSave = requiredComplete && validationError === null && !saving;
   const showRequiredErrors = submitAttempted;
 
@@ -55,7 +60,11 @@ export function FilmFormScreen({ navigation, route }: Props) {
       return;
     }
 
-    const formError = validateTeamFilmForm({ title, videoSource });
+    const formError = isUpload
+      ? title.trim().length === 0
+        ? 'Title is required.'
+        : null
+      : validateTeamFilmForm({ title, videoSource });
 
     if (formError) {
       setError(null);
@@ -90,6 +99,7 @@ export function FilmFormScreen({ navigation, route }: Props) {
   }, [
     draft.id,
     editingExisting,
+    isUpload,
     navigation,
     notes,
     selectedTeam?.id,
@@ -141,25 +151,33 @@ export function FilmFormScreen({ navigation, route }: Props) {
         <EventFormFieldError message="Title is required." />
       ) : null}
 
-      <EventFormFieldLabel label="Video link" required />
-      <TextInput
-        style={styles.input}
-        value={videoSource}
-        onChangeText={setVideoSource}
-        placeholder="https://..."
-        placeholderTextColor={palette.text.muted}
-        editable={!saving}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="url"
-        textContentType="URL"
-      />
-      <Text style={styles.helperText}>
-        Paste a link from YouTube, Hudl, Google Drive, Vimeo, or Dropbox.
-      </Text>
-      {showRequiredErrors && validationError ? (
-        <EventFormFieldError message={validationError} />
-      ) : null}
+      {!isUpload ? (
+        <>
+          <EventFormFieldLabel label="Video link" required />
+          <TextInput
+            style={styles.input}
+            value={videoSource}
+            onChangeText={setVideoSource}
+            placeholder="https://..."
+            placeholderTextColor={palette.text.muted}
+            editable={!saving}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            textContentType="URL"
+          />
+          <Text style={styles.helperText}>
+            Paste a link from YouTube, Hudl, Google Drive, Vimeo, or Dropbox.
+          </Text>
+          {showRequiredErrors && validationError ? (
+            <EventFormFieldError message={validationError} />
+          ) : null}
+        </>
+      ) : (
+        <Text style={styles.helperText}>
+          The uploaded video file stays the same. You can edit the title and notes here.
+        </Text>
+      )}
 
       <EventFormFieldLabel label="Notes" />
       <TextInput

@@ -1,3 +1,4 @@
+import { deleteFilmFile } from './filmStorageRepository';
 import { supabase } from './supabase';
 import type { TeamFilm, TeamFilmDraft, TeamFilmVideoSourceType } from '../types/teamFilm';
 import { detectVideoSourceType } from '../utils/teamFilmDisplay';
@@ -64,6 +65,16 @@ function rowToFilm(row: TeamFilmRow): TeamFilm {
   };
 }
 
+function inferVideoSourceType(videoSource: string): TeamFilmVideoSourceType {
+  const trimmed = videoSource.trim();
+
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return detectVideoSourceType(trimmed);
+  }
+
+  return 'upload';
+}
+
 function draftToPayload(draft: TeamFilmDraft) {
   const trimmedSource = draft.video_source.trim();
 
@@ -71,7 +82,7 @@ function draftToPayload(draft: TeamFilmDraft) {
     title: draft.title.trim(),
     notes: normalizeOptionalText(draft.notes),
     video_source: trimmedSource,
-    video_source_type: detectVideoSourceType(trimmedSource),
+    video_source_type: inferVideoSourceType(trimmedSource),
   };
 }
 
@@ -127,8 +138,12 @@ export async function updateTeamFilm(teamId: string, draft: TeamFilmDraft): Prom
   return rowToFilm(data as TeamFilmRow);
 }
 
-export async function deleteTeamFilm(teamId: string, filmId: string): Promise<void> {
-  const { error } = await supabase.from('team_films').delete().eq('team_id', teamId).eq('id', filmId);
+export async function deleteTeamFilm(teamId: string, film: TeamFilm): Promise<void> {
+  if (film.video_source_type === 'upload') {
+    await deleteFilmFile(film.video_source);
+  }
+
+  const { error } = await supabase.from('team_films').delete().eq('team_id', teamId).eq('id', film.id);
 
   if (error) {
     throwRepositoryError(error);

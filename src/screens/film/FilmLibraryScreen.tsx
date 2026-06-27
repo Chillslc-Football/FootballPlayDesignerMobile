@@ -10,19 +10,16 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { CalendarEmptyState } from '../../components/calendar/CalendarEmptyState';
+import { FilmLibraryCard } from '../../components/film/FilmLibraryCard';
 import { ScreenContainer } from '../../components/ScreenContainer';
-import { cardPresets, palette, spacing, typography } from '../../design-system';
+import { spacing, typography } from '../../design-system';
 import { fetchTeamFilmsByTeam } from '../../lib/filmRepository';
 import { fetchTeamRoster } from '../../lib/teamRepository';
 import { FilmStackParamList } from '../../navigation/FilmStack';
 import { useTeam } from '../../team/TeamProvider';
 import { colors } from '../../theme';
-import { createEmptyTeamFilmDraft, type TeamFilm } from '../../types/teamFilm';
+import type { TeamFilm } from '../../types/teamFilm';
 import { canEditPlayMetadata } from '../../utils/canEditPlayMetadata';
-import {
-  formatTeamFilmAddedDate,
-  previewTeamFilmNotes,
-} from '../../utils/teamFilmDisplay';
 
 type NavigationProp = NativeStackNavigationProp<FilmStackParamList, 'FilmLibrary'>;
 
@@ -98,14 +95,15 @@ export function FilmLibraryScreen() {
   );
 
   const handleAddFilm = () => {
-    navigation.navigate('FilmForm', {
-      draft: createEmptyTeamFilmDraft(),
-      editingExisting: false,
-    });
+    navigation.navigate('FilmAddMethod');
+  };
+
+  const handleOpenFilmDetail = (film: TeamFilm) => {
+    navigation.navigate('FilmDetail', { film });
   };
 
   const handleOpenFilm = (film: TeamFilm) => {
-    navigation.navigate('FilmDetail', { film });
+    navigation.navigate('WatchFilm', { film });
   };
 
   const emptyMessage = useMemo(() => {
@@ -153,24 +151,15 @@ export function FilmLibraryScreen() {
         </View>
       ) : null}
 
-      {films.map((film) => {
-        const addedBy = creatorNames[film.created_by] ?? 'Team member';
-        const notesPreview = previewTeamFilmNotes(film.notes);
-
-        return (
-          <Pressable
-            key={film.id}
-            style={({ pressed }) => [styles.filmCard, pressed && styles.filmCardPressed]}
-            onPress={() => handleOpenFilm(film)}
-          >
-            <Text style={styles.filmTitle}>{film.title}</Text>
-            <Text style={styles.filmMeta}>
-              Added by {addedBy} · {formatTeamFilmAddedDate(film.created_at)}
-            </Text>
-            {notesPreview ? <Text style={styles.filmNotesPreview}>{notesPreview}</Text> : null}
-          </Pressable>
-        );
-      })}
+      {films.map((film) => (
+        <FilmLibraryCard
+          key={film.id}
+          film={film}
+          addedBy={creatorNames[film.created_by] ?? 'Team member'}
+          onOpen={handleOpenFilm}
+          onPress={handleOpenFilmDetail}
+        />
+      ))}
     </ScreenContainer>
   );
 }
@@ -212,28 +201,5 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: spacing.lg,
     paddingVertical: 12,
-  },
-  filmCard: {
-    ...cardPresets.default.container,
-    marginBottom: spacing.lg,
-  },
-  filmCardPressed: {
-    opacity: 0.92,
-  },
-  filmTitle: {
-    ...typography.subheading,
-    fontWeight: typography.heading.fontWeight,
-    color: palette.text.primary,
-    marginBottom: spacing.sm,
-  },
-  filmMeta: {
-    ...typography.bodySmall,
-    color: palette.text.muted,
-  },
-  filmNotesPreview: {
-    ...typography.bodySmall,
-    color: palette.text.secondary,
-    marginTop: spacing.sm,
-    lineHeight: typography.body.lineHeight,
   },
 });

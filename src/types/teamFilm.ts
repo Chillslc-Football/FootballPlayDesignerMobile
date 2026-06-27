@@ -45,3 +45,19 @@ export function createEmptyTeamFilmDraft(): TeamFilmDraft {
     video_source: '',
   };
 }
+
+export function generateFilmId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+    const random = (Math.random() * 16) | 0;
+    const value = character === 'x' ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
+export function isUploadFilm(film: Pick<TeamFilm, 'video_source_type'>): boolean {
+  return film.video_source_type === 'upload';
+}

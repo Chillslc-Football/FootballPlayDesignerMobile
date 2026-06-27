@@ -39,8 +39,17 @@ export default {
         {
           photosPermission:
             'Allow Football Play Designer to access your photos to set your profile picture.',
+          cameraPermission:
+            'Allow Football Play Designer to access your camera to set your profile picture.',
         },
       ],
+      [
+        'expo-document-picker',
+        {
+          iCloudContainerEnvironment: 'Production',
+        },
+      ],
+      'expo-video',
       '@react-native-community/datetimepicker',
     ],
     web: {

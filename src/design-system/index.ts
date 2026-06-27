@@ -16,6 +16,9 @@ export { inputPresets, type InputPresets } from './inputs';
 export { avatarSizes, type AvatarSizes } from './avatars';
 export { iconSizes, type IconSizes } from './icons';
 export { animation, type Animation } from './animations';
+export { AppThemeProvider, useAppTheme, useStackScreenOptions } from './AppThemeProvider';
+export type { AppThemeContextValue } from './AppThemeProvider';
+export { APP_THEME_DEFINITIONS, type AppThemeId } from './themes/appThemeDefinitions';
 
 import { palette, legacyColors } from './colors';
 import { spacing, screenPaddingHorizontal, screenPaddingBottom } from './spacing';

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -14,7 +13,7 @@ import { CalendarMonthView } from '../../components/calendar/CalendarMonthView';
 import { CalendarScheduleView } from '../../components/calendar/CalendarScheduleView';
 import { CalendarViewModeSelector } from '../../components/calendar/CalendarViewModeSelector';
 import { ScreenContainer } from '../../components/ScreenContainer';
-import { palette, radius, spacing, typography } from '../../design-system';
+import { palette, spacing, typography } from '../../design-system';
 import { CalendarStackParamList } from '../../navigation/CalendarStack';
 import { fetchTeamEventsByTeam } from '../../lib/teamEventRepository';
 import { useTeam } from '../../team/TeamProvider';
@@ -137,16 +136,12 @@ export function CalendarEventListScreen() {
 
   return (
     <ScreenContainer title="Calendar" subtitle={selectedTeam?.name ?? 'Team schedule'}>
-      <CalendarViewModeSelector value={viewMode} onChange={handleViewModeChange} />
-
-      {canManageEvents ? (
-        <Pressable
-          style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
-          onPress={handleCreateEvent}
-        >
-          <Text style={styles.addButtonText}>+ Add Event</Text>
-        </Pressable>
-      ) : null}
+      <CalendarViewModeSelector
+        value={viewMode}
+        onChange={handleViewModeChange}
+        showAddButton={canManageEvents}
+        onAddEvent={handleCreateEvent}
+      />
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -189,30 +184,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: spacing.xxxl + spacing.lg,
   },
-  addButton: {
-    width: '100%',
-    backgroundColor: palette.interactive.primary,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: palette.border.default,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md + 2,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-  },
-  addButtonPressed: {
-    opacity: 0.88,
-  },
-  addButtonText: {
-    ...typography.subheading,
-    fontWeight: typography.heading.fontWeight,
-    color: palette.text.primary,
-  },
   error: {
     ...typography.bodySmall,
     color: palette.status.error,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
 });

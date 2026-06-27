@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { fontSize, palette, radius, spacing, typography } from '../../design-system';
 import type { TeamEvent } from '../../types/teamEvent';
@@ -29,6 +29,30 @@ type CalendarMonthViewProps = {
   onOpenEvent: (event: TeamEvent) => void;
 };
 
+const MONTH_GRID_MAX_ROWS = 6;
+const MONTH_GRID_RESERVED_HEIGHT = 320;
+const MONTH_DAY_CELL_MIN_HEIGHT = 72;
+const MONTH_DAY_CELL_MAX_HEIGHT = 100;
+
+type MonthGridLayout = {
+  dayCellMinHeight: number;
+  gridHeight: number;
+};
+
+function useMonthGridLayout(weekRowCount: number): MonthGridLayout {
+  const { height } = useWindowDimensions();
+  const available = Math.max(0, height - MONTH_GRID_RESERVED_HEIGHT);
+  const baselineRowHeight = Math.max(
+    MONTH_DAY_CELL_MIN_HEIGHT,
+    Math.min(MONTH_DAY_CELL_MAX_HEIGHT, Math.floor(available / MONTH_GRID_MAX_ROWS)),
+  );
+  const gridHeight = baselineRowHeight * MONTH_GRID_MAX_ROWS;
+  const rows = Math.max(weekRowCount, 1);
+  const dayCellMinHeight = Math.max(MONTH_DAY_CELL_MIN_HEIGHT, Math.floor(gridHeight / rows));
+
+  return { dayCellMinHeight, gridHeight };
+}
+
 export function CalendarMonthView({
   events,
   visibleMonth,
@@ -42,6 +66,8 @@ export function CalendarMonthView({
     () => getMonthGridCells(visibleMonth.getFullYear(), visibleMonth.getMonth()),
     [visibleMonth],
   );
+  const monthGridRowCount = monthCells.length / 7;
+  const { dayCellMinHeight, gridHeight } = useMonthGridLayout(monthGridRowCount);
   const selectedDayEvents = useMemo(
     () => getEventsForDate(eventsByDate, selectedDate),
     [eventsByDate, selectedDate],
@@ -85,7 +111,7 @@ export function CalendarMonthView({
         ))}
       </View>
 
-      <View style={styles.grid}>
+      <View style={[styles.grid, { minHeight: gridHeight }]}>
         {monthCells.map((cell) => {
           const selected = isSameLocalDay(cell.date, selectedDate);
           const today = isToday(cell.date);
@@ -97,6 +123,7 @@ export function CalendarMonthView({
               key={cell.date.toISOString()}
               style={({ pressed }) => [
                 styles.dayCell,
+                { minHeight: dayCellMinHeight },
                 !cell.inCurrentMonth && styles.dayCellOutsideMonth,
                 selected && styles.dayCellSelected,
                 pressed && styles.dayCellPressed,
@@ -200,11 +227,10 @@ const styles = StyleSheet.create({
   },
   dayCell: {
     width: `${100 / 7}%`,
-    aspectRatio: 1,
     alignItems: 'stretch',
     justifyContent: 'flex-start',
     borderRadius: radius.md,
-    paddingHorizontal: 2,
+    paddingHorizontal: 3,
     paddingTop: spacing.xs,
     paddingBottom: spacing.xs,
     overflow: 'hidden',
@@ -238,7 +264,7 @@ const styles = StyleSheet.create({
     color: palette.accent.default,
   },
   dayEvents: {
-    gap: 2,
+    gap: 3,
     flex: 1,
   },
   moreEventsLabel: {

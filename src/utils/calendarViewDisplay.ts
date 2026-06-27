@@ -68,19 +68,25 @@ export function isToday(date: Date, now = new Date()): boolean {
 
 export function getMonthGridCells(year: number, month: number): CalendarMonthCell[] {
   const firstOfMonth = new Date(year, month, 1);
-  const startOffset = firstOfMonth.getDay();
-  const gridStart = addDays(firstOfMonth, -startOffset);
+  const lastOfMonth = new Date(year, month + 1, 0);
+  const gridStart = addDays(firstOfMonth, -firstOfMonth.getDay());
+  const gridEnd = addDays(lastOfMonth, 6 - lastOfMonth.getDay());
   const cells: CalendarMonthCell[] = [];
+  let current = gridStart;
 
-  for (let index = 0; index < 42; index += 1) {
-    const date = addDays(gridStart, index);
+  while (current.getTime() <= gridEnd.getTime()) {
     cells.push({
-      date,
-      inCurrentMonth: date.getMonth() === month,
+      date: current,
+      inCurrentMonth: current.getMonth() === month,
     });
+    current = addDays(current, 1);
   }
 
   return cells;
+}
+
+export function getMonthGridRowCount(year: number, month: number): number {
+  return getMonthGridCells(year, month).length / 7;
 }
 
 export function getWeekDates(anchor: Date): Date[] {

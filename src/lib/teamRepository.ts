@@ -1,8 +1,12 @@
-import { listDmEligibleMembers } from './teamMessageRepository';
 import { supabase } from './supabase';
 import type { ProfileNameFields } from '../types/profile';
+import {
+  buildTeamMemberPlayerInfoDbPayload,
+  type TeamMemberPlayerInfoUpdate,
+} from '../types/playerPosition';
 import type { Team, TeamMembership, TeamRole, TeamRosterMember } from '../types/team';
 import { resolveProfileDisplayName } from '../utils/profileDisplay';
+import { mapRosterMemberPlayerInfo } from '../utils/rosterDisplay';
 
 type TeamMemberJoinRow = {
   role: TeamRole;
@@ -60,49 +64,60 @@ export async function fetchUserTeamMemberships(userId: string): Promise<{
   };
 }
 
-type TeamRosterJoinRow = {
+type TeamRosterMemberRow = {
   user_id: string;
   role: TeamRole;
-  profiles: (ProfileNameFields & { id: string }) | (ProfileNameFields & { id: string })[] | null;
+  jersey_number: number | null;
+  primary_position: string | null;
+  secondary_position: string | null;
 };
 
-function normalizeProfile(
-  value: TeamRosterJoinRow['profiles'],
-): (ProfileNameFields & { id: string }) | null {
-  if (!value) {
-    return null;
+type ProfileRow = ProfileNameFields & { id: string };
+
+async function fetchProfileNamesByUserIds(
+  userIds: string[],
+): Promise<Map<string, string | null>> {
+  const nameByUserId = new Map<string, string | null>();
+
+  if (userIds.length === 0) {
+    return nameByUserId;
   }
 
-  return Array.isArray(value) ? (value[0] ?? null) : value;
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name, email')
+    .in('id', userIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  for (const row of (data ?? []) as ProfileRow[]) {
+    nameByUserId.set(row.id, resolveProfileDisplayName(row));
+  }
+
+  return nameByUserId;
 }
 
 export async function fetchTeamRoster(teamId: string): Promise<TeamRosterMember[]> {
   const { data, error } = await supabase
     .from('team_members')
-    .select('user_id, role, profiles(display_name, email)')
+    .select('user_id, role, jersey_number, primary_position, secondary_position')
     .eq('team_id', teamId);
 
   if (error) {
-    const members = await listDmEligibleMembers(teamId);
-
-    return members.map((member) => ({
-      user_id: member.user_id,
-      role: member.role as TeamRole,
-      display_name: member.display_name,
-    }));
+    throw new Error(error.message);
   }
 
-  const roster: TeamRosterMember[] = [];
+  const rows = (data ?? []) as TeamRosterMemberRow[];
+  const nameByUserId = await fetchProfileNamesByUserIds(rows.map((row) => row.user_id));
 
-  for (const row of (data ?? []) as TeamRosterJoinRow[]) {
-    const profile = normalizeProfile(row.profiles);
-
-    roster.push({
-      user_id: row.user_id,
-      role: row.role,
-      display_name: resolveProfileDisplayName(profile),
-    });
-  }
+  const roster: TeamRosterMember[] = rows.map((row) => ({
+    user_id: row.user_id,
+    role: row.role,
+    display_name: nameByUserId.get(row.user_id) ?? null,
+    ...mapRosterMemberPlayerInfo(row),
+  }));
 
   roster.sort((left, right) => {
     const leftLabel = left.display_name ?? '';
@@ -111,6 +126,31 @@ export async function fetchTeamRoster(teamId: string): Promise<TeamRosterMember[
   });
 
   return roster;
+}
+
+export async function updateTeamMemberPlayerInfo(
+  teamId: string,
+  userId: string,
+  update: TeamMemberPlayerInfoUpdate,
+): Promise<void> {
+  const dbPayload = buildTeamMemberPlayerInfoDbPayload(update);
+
+  const { data, error } = await supabase
+    .from('team_members')
+    .update(dbPayload)
+    .eq('team_id', teamId)
+    .eq('user_id', userId)
+    .eq('role', 'player')
+    .select('user_id, jersey_number, primary_position, secondary_position')
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new Error('Player record was not updated.');
+  }
 }
 
 export async function fetchProfileDisplayName(userId: string): Promise<string | null> {

@@ -9,8 +9,8 @@ import {
   PlaybookScreen,
   TeamUpdatesScreen,
 } from '../screens';
+import { useAppTheme } from '../design-system';
 import { MoreStack } from './MoreStack';
-import { colors } from '../theme';
 import {
   formatUnreadTabBadge,
   useTeamMessageUnread,
@@ -48,6 +48,7 @@ function TabIcon({ label, color, focused }: { label: string; color: string; focu
 }
 
 export function TabNavigator() {
+  const { colors } = useAppTheme();
   const { unreadCount } = useTeamMessageUnread();
   const chatTabBadge = formatUnreadTabBadge(unreadCount);
 
@@ -77,7 +78,10 @@ export function TabNavigator() {
         options={{
           tabBarHideOnKeyboard: true,
           tabBarBadge: chatTabBadge,
-          tabBarBadgeStyle: styles.tabBadge,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.accent,
+            color: colors.background,
+          },
         }}
       />
       <Tab.Screen name="Film" component={FilmScreen} />
@@ -101,9 +105,5 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 11,
     fontWeight: '600',
-  },
-  tabBadge: {
-    backgroundColor: colors.accent,
-    color: colors.background,
   },
 });

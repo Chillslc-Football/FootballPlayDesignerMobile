@@ -1,8 +1,8 @@
-import { ReactNode } from 'react';
+import { ReactNode, useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors } from '../theme';
+import { useAppTheme } from '../design-system/AppThemeProvider';
 
 type ScreenContainerProps = {
   title: string;
@@ -17,6 +17,43 @@ export function ScreenContainer({
   children,
   scrollable = true,
 }: ScreenContainerProps) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        safeArea: {
+          flex: 1,
+          backgroundColor: colors.background,
+        },
+        scrollContent: {
+          flexGrow: 1,
+          paddingHorizontal: 20,
+          paddingBottom: 24,
+        },
+        content: {
+          flex: 1,
+          paddingHorizontal: 20,
+          paddingBottom: 24,
+        },
+        header: {
+          paddingTop: 8,
+          paddingBottom: 24,
+        },
+        title: {
+          fontSize: 28,
+          fontWeight: '700',
+          color: colors.text,
+          letterSpacing: 0.3,
+        },
+        subtitle: {
+          marginTop: 6,
+          fontSize: 16,
+          color: colors.textSecondary,
+        },
+      }),
+    [colors],
+  );
+
   const content = (
     <>
       <View style={styles.header}>
@@ -42,35 +79,3 @@ export function ScreenContainer({
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-  },
-  header: {
-    paddingTop: 8,
-    paddingBottom: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-    letterSpacing: 0.3,
-  },
-  subtitle: {
-    marginTop: 6,
-    fontSize: 16,
-    color: colors.textSecondary,
-  },
-});

@@ -1,4 +1,10 @@
 import type { TeamEvent, TeamEventDraft } from '../types/teamEvent';
+import {
+  DEFAULT_TEAM_EVENT_REMINDER_OPTION,
+  reminderFieldsToOption,
+  reminderOptionToFields,
+  type TeamEventReminderOptionValue,
+} from './teamEventReminderDisplay';
 
 export function formatTeamEventTimestamp(iso: string): string {
   const date = new Date(iso);
@@ -294,6 +300,7 @@ export function draftToFormValues(draft: TeamEventDraft): {
   endTime: string;
   location: string;
   description: string;
+  reminderOption: TeamEventReminderOptionValue;
 } {
   const startParts = splitIsoToLocalDateAndTime(draft.starts_at);
   const endParts = splitIsoToLocalDateAndTime(draft.ends_at);
@@ -305,6 +312,10 @@ export function draftToFormValues(draft: TeamEventDraft): {
     endTime: endParts.time,
     location: draft.location ?? '',
     description: draft.description ?? '',
+    reminderOption: reminderFieldsToOption(
+      draft.reminder_enabled,
+      draft.reminder_minutes_before,
+    ),
   };
 }
 
@@ -407,11 +418,13 @@ export function formValuesToDraft(
     endTime: string;
     location: string;
     description: string;
+    reminderOption: TeamEventReminderOptionValue;
   },
 ): TeamEventDraft {
   const startsAt = combineLocalDateAndTime(form.date, form.startTime);
   const resolvedEndTime = resolveFormEndTime(form.date, form.startTime, form.endTime);
   const endsAt = combineLocalDateAndTime(form.date, resolvedEndTime);
+  const reminderFields = reminderOptionToFields(form.reminderOption);
 
   return {
     id: eventId,
@@ -420,5 +433,11 @@ export function formValuesToDraft(
     ends_at: endsAt,
     location: form.location.trim().length > 0 ? form.location.trim() : null,
     description: form.description.trim().length > 0 ? form.description.trim() : null,
+    reminder_enabled: reminderFields.reminder_enabled,
+    reminder_minutes_before: reminderFields.reminder_minutes_before,
   };
+}
+
+export function getDefaultEventFormReminderOption(): TeamEventReminderOptionValue {
+  return DEFAULT_TEAM_EVENT_REMINDER_OPTION;
 }

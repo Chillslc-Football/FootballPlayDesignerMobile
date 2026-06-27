@@ -5,7 +5,7 @@ import {
   EventDetailScreen,
   EventFormScreen,
 } from '../screens/calendar';
-import { colors } from '../theme';
+import { useStackScreenOptions } from '../design-system';
 import type { TeamEvent, TeamEventDraft } from '../types/teamEvent';
 
 export type CalendarStackParamList = {
@@ -21,21 +21,9 @@ export type CalendarStackParamList = {
 
 const Stack = createNativeStackNavigator<CalendarStackParamList>();
 
-const stackScreenOptions = {
-  headerStyle: {
-    backgroundColor: colors.tabBar,
-  },
-  headerTintColor: colors.accent,
-  headerTitleStyle: {
-    fontWeight: '600' as const,
-  },
-  headerShadowVisible: false,
-  contentStyle: {
-    backgroundColor: colors.background,
-  },
-};
-
 export function CalendarStack() {
+  const stackScreenOptions = useStackScreenOptions();
+
   return (
     <Stack.Navigator screenOptions={stackScreenOptions}>
       <Stack.Screen

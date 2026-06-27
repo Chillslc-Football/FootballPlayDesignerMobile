@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -14,10 +14,12 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { EventFormFieldError, EventFormFieldLabel } from '../../components/calendar/EventFormFieldLabel';
 import { EventFormPickerField } from '../../components/calendar/EventFormPickerField';
+import { EventReminderPickerModal } from '../../components/calendar/EventReminderPickerModal';
 import { inputPresets, palette, radius, spacing, typography } from '../../design-system';
 import { CalendarStackParamList } from '../../navigation/CalendarStack';
 import { createTeamEvent, updateTeamEvent } from '../../lib/teamEventRepository';
 import { useTeam } from '../../team/TeamProvider';
+import { colors } from '../../theme';
 import {
   areRequiredEventFormFieldsComplete,
   dateFromLocalDateAndTime,
@@ -32,6 +34,10 @@ import {
   resolveFormEndTime,
   validateTeamEventForm,
 } from '../../utils/teamEventDisplay';
+import {
+  getTeamEventReminderOptionLabel,
+  type TeamEventReminderOptionValue,
+} from '../../utils/teamEventReminderDisplay';
 
 type Props = NativeStackScreenProps<CalendarStackParamList, 'EventForm'>;
 
@@ -48,6 +54,10 @@ export function EventFormScreen({ navigation, route }: Props) {
   const [endTime, setEndTime] = useState(editingExisting ? initialValues.endTime : '');
   const [location, setLocation] = useState(initialValues.location);
   const [description, setDescription] = useState(initialValues.description);
+  const [reminderOption, setReminderOption] = useState<TeamEventReminderOptionValue>(
+    initialValues.reminderOption,
+  );
+  const [reminderPickerVisible, setReminderPickerVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -105,7 +115,7 @@ export function EventFormScreen({ navigation, route }: Props) {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     setSubmitAttempted(true);
 
     const teamId = selectedTeam?.id;
@@ -132,6 +142,7 @@ export function EventFormScreen({ navigation, route }: Props) {
         endTime,
         location,
         description,
+        reminderOption,
       });
 
       if (editingExisting) {
@@ -148,7 +159,47 @@ export function EventFormScreen({ navigation, route }: Props) {
     } finally {
       setSaving(false);
     }
-  };
+  }, [
+    date,
+    description,
+    draft.id,
+    editingExisting,
+    endTime,
+    location,
+    navigation,
+    reminderOption,
+    selectedTeam?.id,
+    startTime,
+    title,
+  ]);
+
+  useLayoutEffect(() => {
+    const actionLabel = editingExisting ? 'Save' : 'Create';
+
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable
+          style={({ pressed }) => [
+            styles.headerAction,
+            (!canSave || pressed) && styles.headerActionPressed,
+          ]}
+          onPress={handleSave}
+          disabled={!canSave}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={actionLabel}
+        >
+          {saving ? (
+            <ActivityIndicator color={colors.accent} size="small" />
+          ) : (
+            <Text style={[styles.headerActionText, !canSave && styles.headerActionTextDisabled]}>
+              {actionLabel}
+            </Text>
+          )}
+        </Pressable>
+      ),
+    });
+  }, [canSave, editingExisting, handleSave, navigation, saving]);
 
   return (
     <ScrollView
@@ -230,6 +281,21 @@ export function EventFormScreen({ navigation, route }: Props) {
         </View>
       ) : null}
 
+      <EventFormPickerField
+        label="Reminder"
+        value={getTeamEventReminderOptionLabel(reminderOption)}
+        placeholder="Select reminder"
+        onPress={() => setReminderPickerVisible(true)}
+        disabled={saving}
+      />
+
+      <EventReminderPickerModal
+        visible={reminderPickerVisible}
+        selectedValue={reminderOption}
+        onSelect={setReminderOption}
+        onClose={() => setReminderPickerVisible(false)}
+      />
+
       <View style={styles.field}>
         <EventFormFieldLabel label="Location" optional />
         <TextInput
@@ -257,23 +323,6 @@ export function EventFormScreen({ navigation, route }: Props) {
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      <Pressable
-        style={({ pressed }) => [
-          styles.saveButton,
-          (!canSave || pressed) && styles.saveButtonDisabled,
-        ]}
-        onPress={handleSave}
-        disabled={!canSave}
-      >
-        {saving ? (
-          <ActivityIndicator color={palette.background.primary} size="small" />
-        ) : (
-          <Text style={styles.saveButtonText}>
-            {editingExisting ? 'Save Changes' : 'Create Event'}
-          </Text>
-        )}
-      </Pressable>
     </ScrollView>
   );
 }
@@ -342,23 +391,22 @@ const styles = StyleSheet.create({
     color: palette.status.error,
     marginBottom: spacing.lg,
   },
-  saveButton: {
-    marginTop: spacing.sm,
-    backgroundColor: palette.interactive.primary,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: palette.border.default,
-    paddingVertical: spacing.md + 2,
+  headerAction: {
+    minWidth: 56,
+    minHeight: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
+    paddingHorizontal: spacing.sm,
   },
-  saveButtonDisabled: {
-    opacity: 0.6,
+  headerActionPressed: {
+    opacity: 0.85,
   },
-  saveButtonText: {
-    ...typography.subheading,
+  headerActionText: {
+    ...typography.bodySmall,
     fontWeight: typography.heading.fontWeight,
-    color: palette.text.primary,
+    color: colors.accent,
+  },
+  headerActionTextDisabled: {
+    opacity: 0.45,
   },
 });

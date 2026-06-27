@@ -5,7 +5,7 @@ import {
   PlaybookCategoriesScreen,
   PlaybookPlaysScreen,
 } from '../screens/playbook';
-import { colors } from '../theme';
+import { useStackScreenOptions } from '../design-system';
 
 export type PlaybookStackParamList = {
   Categories: undefined;
@@ -21,21 +21,9 @@ export type PlaybookStackParamList = {
 
 const Stack = createNativeStackNavigator<PlaybookStackParamList>();
 
-const stackScreenOptions = {
-  headerStyle: {
-    backgroundColor: colors.tabBar,
-  },
-  headerTintColor: colors.accent,
-  headerTitleStyle: {
-    fontWeight: '600' as const,
-  },
-  headerShadowVisible: false,
-  contentStyle: {
-    backgroundColor: colors.background,
-  },
-};
-
 export function PlaybookStack() {
+  const stackScreenOptions = useStackScreenOptions();
+
   return (
     <Stack.Navigator screenOptions={stackScreenOptions}>
       <Stack.Screen

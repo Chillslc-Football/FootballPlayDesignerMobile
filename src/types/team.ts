@@ -16,4 +16,7 @@ export type TeamRosterMember = {
   user_id: string;
   role: TeamRole;
   display_name: string | null;
+  jersey_number: number | null;
+  primary_position: string | null;
+  secondary_position: string | null;
 };

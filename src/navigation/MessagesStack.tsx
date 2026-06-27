@@ -1,7 +1,7 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { ChatThreadScreen, ConversationListScreen } from '../screens/messages';
-import { colors } from '../theme';
+import { useStackScreenOptions } from '../design-system';
 
 export type MessagesStackParamList = {
   ConversationList: undefined;
@@ -13,21 +13,9 @@ export type MessagesStackParamList = {
 
 const Stack = createNativeStackNavigator<MessagesStackParamList>();
 
-const stackScreenOptions = {
-  headerStyle: {
-    backgroundColor: colors.tabBar,
-  },
-  headerTintColor: colors.accent,
-  headerTitleStyle: {
-    fontWeight: '600' as const,
-  },
-  headerShadowVisible: false,
-  contentStyle: {
-    backgroundColor: colors.background,
-  },
-};
-
 export function MessagesStack() {
+  const stackScreenOptions = useStackScreenOptions();
+
   return (
     <Stack.Navigator screenOptions={stackScreenOptions}>
       <Stack.Screen

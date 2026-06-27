@@ -224,6 +224,20 @@ export function filterPlaysByCategory(plays: PlaySummary[], categoryName: string
   return plays.filter((play) => play.categories.includes(categoryName));
 }
 
+type PlayDataRow = {
+  data: unknown;
+};
+
+export async function fetchTeamPlayDataByTeam(teamId: string): Promise<unknown[]> {
+  const { data, error } = await supabase.from('plays').select('data').eq('team_id', teamId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as PlayDataRow[]).map((row) => row.data);
+}
+
 async function fetchPlayDataJson(
   teamId: string,
   playId: string,

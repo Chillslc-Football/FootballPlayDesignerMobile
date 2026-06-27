@@ -1,3 +1,5 @@
+import { DEFAULT_TEAM_EVENT_REMINDER_OPTION } from '../utils/teamEventReminderDisplay';
+
 export type TeamEvent = {
   id: string;
   team_id: string;
@@ -6,6 +8,9 @@ export type TeamEvent = {
   ends_at: string;
   location: string | null;
   description: string | null;
+  reminder_enabled: boolean;
+  reminder_minutes_before: number;
+  reminder_sent_at: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -13,7 +18,7 @@ export type TeamEvent = {
 
 export type TeamEventDraft = Omit<
   TeamEvent,
-  'team_id' | 'created_by' | 'created_at' | 'updated_at'
+  'team_id' | 'created_by' | 'created_at' | 'updated_at' | 'reminder_sent_at'
 >;
 
 function generateEventId(): string {
@@ -50,6 +55,8 @@ export function eventToDraft(event: TeamEvent): TeamEventDraft {
     ends_at: event.ends_at,
     location: event.location,
     description: event.description,
+    reminder_enabled: event.reminder_enabled,
+    reminder_minutes_before: event.reminder_minutes_before,
   };
 }
 
@@ -63,5 +70,7 @@ export function createEmptyTeamEventDraft(): TeamEventDraft {
     ends_at,
     location: null,
     description: null,
+    reminder_enabled: true,
+    reminder_minutes_before: Number(DEFAULT_TEAM_EVENT_REMINDER_OPTION),
   };
 }

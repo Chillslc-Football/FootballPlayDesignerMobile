@@ -9,13 +9,16 @@ type TeamEventRow = {
   ends_at: string;
   location: string | null;
   description: string | null;
+  reminder_enabled?: boolean | null;
+  reminder_minutes_before?: number | null;
+  reminder_sent_at?: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
 };
 
 const COLUMNS =
-  'id, team_id, title, starts_at, ends_at, location, description, created_by, created_at, updated_at';
+  'id, team_id, title, starts_at, ends_at, location, description, reminder_enabled, reminder_minutes_before, reminder_sent_at, created_by, created_at, updated_at';
 
 const PERMISSION_ERROR_MESSAGE = 'You do not have permission to manage team events.';
 
@@ -50,6 +53,9 @@ function rowToEvent(row: TeamEventRow): TeamEvent {
     ends_at: row.ends_at,
     location: row.location,
     description: row.description,
+    reminder_enabled: row.reminder_enabled ?? true,
+    reminder_minutes_before: row.reminder_minutes_before ?? 60,
+    reminder_sent_at: row.reminder_sent_at ?? null,
     created_by: row.created_by,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -74,6 +80,8 @@ function draftToInsertPayload(draft: TeamEventDraft, teamId: string) {
     ends_at: draft.ends_at,
     location: normalizeOptionalText(draft.location),
     description: normalizeOptionalText(draft.description),
+    reminder_enabled: draft.reminder_enabled,
+    reminder_minutes_before: draft.reminder_minutes_before,
   };
 }
 
@@ -84,6 +92,8 @@ function draftToUpdatePayload(draft: TeamEventDraft) {
     ends_at: draft.ends_at,
     location: normalizeOptionalText(draft.location),
     description: normalizeOptionalText(draft.description),
+    reminder_enabled: draft.reminder_enabled,
+    reminder_minutes_before: draft.reminder_minutes_before,
     updated_at: new Date().toISOString(),
   };
 }

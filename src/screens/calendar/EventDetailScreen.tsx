@@ -31,6 +31,7 @@ import {
   formatTeamEventDetailDate,
   formatTeamEventDetailTimeRange,
 } from '../../utils/teamEventDisplay';
+import { formatTeamEventReminderLabel } from '../../utils/teamEventReminderDisplay';
 import { buildTeamEventRsvpSummary } from '../../utils/teamEventRsvpDisplay';
 
 type Props = NativeStackScreenProps<CalendarStackParamList, 'EventDetail'>;
@@ -250,6 +251,13 @@ export function EventDetailScreen({ navigation, route }: Props) {
             <Text style={styles.fieldLabel}>Time</Text>
             <Text style={styles.fieldValue}>
               {formatTeamEventDetailTimeRange(event.starts_at, event.ends_at)}
+            </Text>
+          </View>
+
+          <View style={styles.fieldBlock}>
+            <Text style={styles.fieldLabel}>Reminder</Text>
+            <Text style={styles.fieldValue}>
+              {formatTeamEventReminderLabel(event.reminder_enabled, event.reminder_minutes_before)}
             </Text>
           </View>
 

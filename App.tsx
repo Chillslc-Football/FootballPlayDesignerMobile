@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/auth/AuthProvider';
 import { PushNotificationProvider } from './src/notifications/PushNotificationProvider';
 import { TeamMessageNotificationHandler } from './src/notifications/TeamMessageNotificationHandler';
+import { NotificationPermissionPrompt } from './src/components/NotificationPermissionPrompt';
 import { notifyTeamMessageNavigationReady } from './src/notifications/teamMessageNotificationNavigation';
 import { navigationRef } from './src/navigation/navigationRef';
 import { TabNavigator } from './src/navigation/TabNavigator';
@@ -13,18 +14,24 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { TeamSelectorScreen } from './src/screens/TeamSelectorScreen';
 import { TeamMessageUnreadProvider } from './src/team/TeamMessageUnreadProvider';
 import { TeamProvider, useTeam } from './src/team/TeamProvider';
-import { colors } from './src/theme';
+import { AppThemeProvider, useAppTheme } from './src/design-system';
 import { pushDebugLog } from './src/notifications/pushDebugLog';
+
+function LoadingView() {
+  const { colors } = useAppTheme();
+
+  return (
+    <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+      <ActivityIndicator size="large" color={colors.accent} />
+    </View>
+  );
+}
 
 function AuthenticatedApp() {
   const { selectedTeam, loading } = useTeam();
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.accent} />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   if (!selectedTeam) {
@@ -32,16 +39,19 @@ function AuthenticatedApp() {
   }
 
   return (
-    <NavigationContainer
-      ref={navigationRef}
-      onReady={() => {
-        notifyTeamMessageNavigationReady();
-      }}
-    >
-      <TeamMessageUnreadProvider>
-        <TabNavigator />
-      </TeamMessageUnreadProvider>
-    </NavigationContainer>
+    <>
+      <NavigationContainer
+        ref={navigationRef}
+        onReady={() => {
+          notifyTeamMessageNavigationReady();
+        }}
+      >
+        <TeamMessageUnreadProvider>
+          <TabNavigator />
+        </TeamMessageUnreadProvider>
+      </NavigationContainer>
+      <NotificationPermissionPrompt />
+    </>
   );
 }
 
@@ -50,11 +60,7 @@ function AppContent() {
 
   if (loading) {
     pushDebugLog('AppContent auth loading');
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.accent} />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   if (!session) {
@@ -80,10 +86,12 @@ function AppContent() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <StatusBar style="light" />
-        <AppContent />
-      </AuthProvider>
+      <AppThemeProvider>
+        <AuthProvider>
+          <StatusBar style="light" />
+          <AppContent />
+        </AuthProvider>
+      </AppThemeProvider>
     </SafeAreaProvider>
   );
 }
@@ -93,6 +101,5 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.background,
   },
 });

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -14,11 +14,10 @@ import { Card } from '../components/Card';
 import { PlaybookList } from '../components/PlaybookList';
 import { ScreenContainer } from '../components/ScreenContainer';
 import {
-  cardPresets,
-  palette,
   radius,
   spacing,
   typography,
+  useAppTheme,
 } from '../design-system';
 import {
   fetchFeaturedTeamUpdate,
@@ -42,6 +41,7 @@ export function HomeScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<RootTabParamList>>();
   const { selectedTeam, selectedTeamMemberRole, memberships, selectTeam } = useTeam();
   const { unreadCount } = useTeamMessageUnread();
+  const { palette, cardPresets } = useAppTheme();
   const [featuredUpdate, setFeaturedUpdate] = useState<TeamUpdate | null>(null);
   const [loadingFeatured, setLoadingFeatured] = useState(true);
   const [teamPickerVisible, setTeamPickerVisible] = useState(false);
@@ -115,6 +115,138 @@ export function HomeScreen() {
     unreadCount > 0
       ? `${unreadBadge} unread message${unreadCount === 1 ? '' : 's'}`
       : 'All caught up — open Chat';
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        dashboard: {
+          gap: spacing.xxl,
+        },
+        section: {
+          gap: spacing.sm,
+        },
+        sectionLabel: {
+          ...typography.label,
+          color: palette.text.label,
+          marginLeft: spacing.xs,
+        },
+        sectionCard: {
+          ...cardPresets.default.container,
+          marginBottom: 0,
+        },
+        teamSelectorCard: {
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        teamSelectorContent: {
+          flex: 1,
+        },
+        teamChevron: {
+          fontSize: 22,
+          color: palette.text.muted,
+          fontWeight: '300',
+          marginLeft: spacing.sm,
+        },
+        cardPressed: {
+          opacity: 0.92,
+        },
+        teamName: {
+          ...typography.heading,
+          color: palette.text.primary,
+        },
+        teamRole: {
+          ...typography.bodySmall,
+          color: palette.text.secondary,
+          marginTop: spacing.xs,
+        },
+        placeholderText: {
+          ...typography.bodySmall,
+          color: palette.text.muted,
+        },
+        featuredLoading: {
+          paddingVertical: spacing.sm,
+          alignItems: 'flex-start',
+        },
+        badgeRow: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: spacing.sm,
+          marginBottom: spacing.sm,
+        },
+        featuredBadge: {
+          borderRadius: radius.xl,
+          borderWidth: 1,
+          borderColor: palette.accent.default,
+          paddingHorizontal: spacing.sm + 2,
+          paddingVertical: spacing.xs,
+        },
+        featuredBadgeText: {
+          fontSize: typography.caption.fontSize,
+          fontWeight: typography.label.fontWeight,
+          color: palette.accent.default,
+          textTransform: 'uppercase',
+          letterSpacing: typography.label.letterSpacing,
+        },
+        pinnedBadge: {
+          borderRadius: radius.xl,
+          borderWidth: 1,
+          borderColor: palette.text.label,
+          paddingHorizontal: spacing.sm + 2,
+          paddingVertical: spacing.xs,
+        },
+        pinnedBadgeText: {
+          fontSize: typography.caption.fontSize,
+          fontWeight: typography.label.fontWeight,
+          color: palette.text.label,
+          textTransform: 'uppercase',
+          letterSpacing: typography.label.letterSpacing,
+        },
+        cardText: {
+          ...typography.subheading,
+          fontWeight: typography.subheading.fontWeight,
+          color: palette.text.primary,
+        },
+        cardSubtext: {
+          ...typography.bodySmall,
+          color: palette.text.secondary,
+        },
+        cardMeta: {
+          marginTop: spacing.sm,
+          fontSize: typography.caption.fontSize,
+          color: palette.text.muted,
+        },
+        modalBackdrop: {
+          flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          justifyContent: 'center',
+          paddingHorizontal: spacing.xl,
+        },
+        modalSheet: {
+          backgroundColor: palette.background.primary,
+          borderRadius: radius.lg,
+          borderWidth: 1,
+          borderColor: palette.border.default,
+          padding: spacing.lg,
+          maxHeight: '70%',
+        },
+        modalTitle: {
+          ...typography.subheading,
+          fontWeight: typography.heading.fontWeight,
+          color: palette.text.primary,
+          marginBottom: spacing.xs,
+        },
+        modalSubtitle: {
+          ...typography.bodySmall,
+          color: palette.text.secondary,
+          marginBottom: spacing.lg,
+        },
+        modalLoading: {
+          marginTop: spacing.lg,
+          alignItems: 'center',
+        },
+      }),
+    [cardPresets, palette],
+  );
 
   return (
     <ScreenContainer title="Winner's Choice" subtitle="What do I need to know today?">
@@ -253,126 +385,3 @@ export function HomeScreen() {
   );
 }
 
-const sectionCardStyle = {
-  ...cardPresets.default.container,
-  marginBottom: 0,
-};
-
-const styles = StyleSheet.create({
-  dashboard: {
-    gap: spacing.xxl,
-  },
-  section: {
-    gap: spacing.sm,
-  },
-  sectionLabel: {
-    ...typography.label,
-    marginLeft: spacing.xs,
-  },
-  sectionCard: sectionCardStyle,
-  teamSelectorCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  teamSelectorContent: {
-    flex: 1,
-  },
-  teamChevron: {
-    fontSize: 22,
-    color: palette.text.muted,
-    fontWeight: '300',
-    marginLeft: spacing.sm,
-  },
-  cardPressed: {
-    opacity: 0.92,
-  },
-  teamName: typography.heading,
-  teamRole: {
-    ...typography.bodySmall,
-    color: palette.text.secondary,
-    marginTop: spacing.xs,
-  },
-  placeholderText: {
-    ...typography.bodySmall,
-    color: palette.text.muted,
-  },
-  featuredLoading: {
-    paddingVertical: spacing.sm,
-    alignItems: 'flex-start',
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  featuredBadge: {
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: palette.accent.default,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs,
-  },
-  featuredBadgeText: {
-    fontSize: typography.caption.fontSize,
-    fontWeight: typography.label.fontWeight,
-    color: palette.accent.default,
-    textTransform: 'uppercase',
-    letterSpacing: typography.label.letterSpacing,
-  },
-  pinnedBadge: {
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: palette.text.label,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs,
-  },
-  pinnedBadgeText: {
-    fontSize: typography.caption.fontSize,
-    fontWeight: typography.label.fontWeight,
-    color: palette.text.label,
-    textTransform: 'uppercase',
-    letterSpacing: typography.label.letterSpacing,
-  },
-  cardText: {
-    ...typography.subheading,
-    fontWeight: typography.subheading.fontWeight,
-  },
-  cardSubtext: {
-    ...typography.bodySmall,
-    color: palette.text.secondary,
-  },
-  cardMeta: {
-    marginTop: spacing.sm,
-    fontSize: typography.caption.fontSize,
-    color: palette.text.muted,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-  },
-  modalSheet: {
-    backgroundColor: palette.background.primary,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: palette.border.default,
-    padding: spacing.lg,
-    maxHeight: '70%',
-  },
-  modalTitle: {
-    ...typography.subheading,
-    fontWeight: typography.heading.fontWeight,
-    marginBottom: spacing.xs,
-  },
-  modalSubtitle: {
-    ...typography.bodySmall,
-    color: palette.text.secondary,
-    marginBottom: spacing.lg,
-  },
-  modalLoading: {
-    marginTop: spacing.lg,
-    alignItems: 'center',
-  },
-});

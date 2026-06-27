@@ -27,7 +27,7 @@ const styles = StyleSheet.create({
   chip: {
     borderRadius: radius.sm,
     paddingHorizontal: spacing.xs,
-    minHeight: 16,
+    minHeight: 18,
     justifyContent: 'center',
   },
   chipDefault: {
@@ -39,6 +39,6 @@ const styles = StyleSheet.create({
     fontSize: fontSize.caption,
     fontWeight: typography.subheading.fontWeight,
     color: palette.text.secondary,
-    lineHeight: 14,
+    lineHeight: 15,
   },
 });

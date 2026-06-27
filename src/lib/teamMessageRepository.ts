@@ -6,12 +6,17 @@ import type {
   DirectMessageEligibleMember,
   DirectMessageThreadWithUnread,
   TeamMessage,
+  TeamMessageHomeSummary,
   TeamMessageMentionAudience,
   TeamMessageThread,
   TeamMessageThreadKind,
   TeamMessageThreadWithUnread,
 } from '../types/teamMessage';
 import { resolveProfileDisplayName } from '../utils/profileDisplay';
+import {
+  formatHomeChatChannelLabel,
+  formatHomeChatPreviewLine,
+} from '../utils/teamMessageDisplay';
 
 type TeamMessageThreadRow = {
   id: string;
@@ -247,6 +252,56 @@ export async function fetchTeamMessagesByThread(
   }
 
   return enrichMessagesWithSenderProfiles((data ?? []) as TeamMessageRow[]);
+}
+
+export async function fetchLatestTeamMessageSummary(
+  teamId: string,
+): Promise<TeamMessageHomeSummary | null> {
+  const [channels, directMessages] = await Promise.all([
+    listAccessibleTeamMessageThreads(teamId),
+    listDirectMessageThreads(teamId),
+  ]);
+
+  const threadsWithActivity = [...channels, ...directMessages].filter(
+    (thread) => thread.last_message_at != null,
+  );
+
+  if (threadsWithActivity.length === 0) {
+    return null;
+  }
+
+  threadsWithActivity.sort(
+    (left, right) =>
+      new Date(right.last_message_at!).getTime() - new Date(left.last_message_at!).getTime(),
+  );
+
+  const latestThread = threadsWithActivity[0];
+
+  const { data, error } = await supabase
+    .from('team_messages')
+    .select(MESSAGE_COLUMNS)
+    .eq('team_id', teamId)
+    .eq('thread_id', latestThread.id)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const [message] = await enrichMessagesWithSenderProfiles([data as TeamMessageRow]);
+
+  return {
+    channelLabel: formatHomeChatChannelLabel(latestThread.thread_kind),
+    previewLine: formatHomeChatPreviewLine(message.sender_name, message.body),
+    created_at: message.created_at,
+  };
 }
 
 export async function markThreadRead(threadId: string, upToMessageId: string): Promise<void> {

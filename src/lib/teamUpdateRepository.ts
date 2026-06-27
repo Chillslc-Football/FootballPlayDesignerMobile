@@ -6,6 +6,7 @@ import {
   type TeamUpdate,
   type TeamUpdateType,
 } from '../types/teamUpdate';
+import { deriveTeamUpdateTitle } from '../utils/teamUpdateDisplay';
 
 type TeamUpdateRow = {
   id: string;
@@ -68,7 +69,6 @@ export async function fetchTeamUpdatesByTeam(teamId: string): Promise<TeamUpdate
     .from('team_updates')
     .select(COLUMNS)
     .eq('team_id', teamId)
-    .order('is_pinned', { ascending: false })
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -78,12 +78,11 @@ export async function fetchTeamUpdatesByTeam(teamId: string): Promise<TeamUpdate
   return ((data ?? []) as TeamUpdateRow[]).map(rowToUpdate);
 }
 
-export async function fetchFeaturedTeamUpdate(teamId: string): Promise<TeamUpdate | null> {
+export async function fetchLatestTeamUpdate(teamId: string): Promise<TeamUpdate | null> {
   const { data, error } = await supabase
     .from('team_updates')
     .select(COLUMNS)
     .eq('team_id', teamId)
-    .eq('show_on_home', true)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -99,17 +98,17 @@ export async function fetchFeaturedTeamUpdate(teamId: string): Promise<TeamUpdat
   return rowToUpdate(data as TeamUpdateRow);
 }
 
+/** @deprecated Use fetchLatestTeamUpdate */
+export const fetchFeaturedTeamUpdate = fetchLatestTeamUpdate;
+
 export async function createTeamUpdate(input: CreateTeamUpdateInput): Promise<TeamUpdate> {
-  const trimmedTitle = input.title.trim();
   const trimmedBody = input.body.trim();
 
-  if (trimmedTitle.length === 0) {
-    throw new Error('Title is required.');
+  if (trimmedBody.length === 0) {
+    throw new Error('Update is required.');
   }
 
-  if (trimmedBody.length === 0) {
-    throw new Error('Body is required.');
-  }
+  const trimmedTitle = input.title?.trim() || deriveTeamUpdateTitle(trimmedBody);
 
   const { data, error } = await supabase
     .from('team_updates')
@@ -117,8 +116,8 @@ export async function createTeamUpdate(input: CreateTeamUpdateInput): Promise<Te
       team_id: input.teamId,
       title: trimmedTitle,
       body: trimmedBody,
-      update_type: input.update_type,
-      is_pinned: input.is_pinned,
+      update_type: input.update_type ?? DEFAULT_TEAM_UPDATE_TYPE,
+      is_pinned: input.is_pinned ?? false,
       created_by: input.createdBy,
     })
     .select(COLUMNS)

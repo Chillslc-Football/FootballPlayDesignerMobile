@@ -18,6 +18,13 @@ export function previewTeamUpdateBody(body: string, maxLength = 120): string {
   return `${trimmed.slice(0, maxLength).trimEnd()}…`;
 }
 
+export function deriveTeamUpdateTitle(body: string): string {
+  const trimmed = body.trim();
+  const firstLine = trimmed.split(/\r?\n/, 1)[0]?.trim() ?? '';
+
+  return firstLine || 'Team Update';
+}
+
 export function formatTeamUpdateDate(iso: string): string {
   const date = new Date(iso);
 

@@ -62,3 +62,9 @@ export type TeamMessage = {
   edited_at: string | null;
   deleted_at: string | null;
 };
+
+export type TeamMessageHomeSummary = {
+  channelLabel: string;
+  previewLine: string;
+  created_at: string;
+};

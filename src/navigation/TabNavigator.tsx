@@ -10,6 +10,7 @@ import {
   TeamUpdatesScreen,
 } from '../screens';
 import { useAppTheme } from '../design-system';
+import { EqualWidthBottomTabBar } from './EqualWidthBottomTabBar';
 import { MoreStack } from './MoreStack';
 import {
   formatUnreadTabBadge,
@@ -24,7 +25,7 @@ export type RootTabParamList = {
   Film: undefined;
   More: undefined;
   /** Hidden tab — reachable from Home, not shown in tab bar */
-  Updates: undefined;
+  Updates: { openCreate?: boolean };
 };
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -54,6 +55,7 @@ export function TabNavigator() {
 
   return (
     <Tab.Navigator
+      tabBar={(props) => <EqualWidthBottomTabBar {...props} />}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.tabBarActive,
@@ -62,7 +64,12 @@ export function TabNavigator() {
           backgroundColor: colors.tabBar,
           borderTopColor: colors.divider,
           borderTopWidth: 1,
+          width: '100%',
+          paddingHorizontal: 0,
+          marginHorizontal: 0,
         },
+        tabBarItemStyle: styles.tabBarItem,
+        tabBarIconStyle: styles.tabBarIcon,
         tabBarLabelStyle: styles.tabLabel,
         tabBarIcon: ({ color, focused }) => (
           <TabIcon label={tabIcons[route.name]} color={color} focused={focused} />
@@ -99,11 +106,25 @@ export function TabNavigator() {
 }
 
 const styles = StyleSheet.create({
+  tabBarItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  tabBarIcon: {
+    marginTop: 0,
+    marginBottom: 0,
+  },
   tabIcon: {
     fontSize: 20,
+    textAlign: 'center',
   },
   tabLabel: {
     fontSize: 11,
     fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 2,
+    marginBottom: 0,
   },
 });

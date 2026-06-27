@@ -112,6 +112,29 @@ export async function fetchTeamEventsByTeam(teamId: string): Promise<TeamEvent[]
   return ((data ?? []) as TeamEventRow[]).map(rowToEvent);
 }
 
+export async function fetchNextUpcomingTeamEvent(teamId: string): Promise<TeamEvent | null> {
+  const nowIso = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from('team_events')
+    .select(COLUMNS)
+    .eq('team_id', teamId)
+    .gte('starts_at', nowIso)
+    .order('starts_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return rowToEvent(data as TeamEventRow);
+}
+
 export async function createTeamEvent(teamId: string, draft: TeamEventDraft): Promise<TeamEvent> {
   const trimmedTitle = draft.title.trim();
 

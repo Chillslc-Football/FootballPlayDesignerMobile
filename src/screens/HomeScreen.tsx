@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -20,22 +20,29 @@ import {
   useAppTheme,
 } from '../design-system';
 import {
-  fetchFeaturedTeamUpdate,
+  fetchLatestTeamUpdate,
   subscribeTeamUpdatesByTeam,
 } from '../lib/teamUpdateRepository';
+import { fetchLatestTeamMessageSummary } from '../lib/teamMessageRepository';
+import { fetchNextUpcomingTeamEvent } from '../lib/teamEventRepository';
 import type { RootTabParamList } from '../navigation/TabNavigator';
 import {
-  formatUnreadTabBadge,
   useTeamMessageUnread,
 } from '../team/TeamMessageUnreadProvider';
 import { useTeam } from '../team/TeamProvider';
 import type { TeamUpdate } from '../types/teamUpdate';
+import type { TeamMessageHomeSummary } from '../types/teamMessage';
+import type { TeamEvent } from '../types/teamEvent';
+import {
+  formatTeamEventListDate,
+  formatTeamEventListTimeRange,
+} from '../utils/teamEventDisplay';
 import { formatTeamRole } from '../utils/roleLabels';
 import {
   formatTeamUpdateDate,
-  formatTeamUpdateType,
   previewTeamUpdateBody,
 } from '../utils/teamUpdateDisplay';
+import { canEditPlayMetadata } from '../utils/canEditPlayMetadata';
 
 export function HomeScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<RootTabParamList>>();
@@ -43,7 +50,11 @@ export function HomeScreen() {
   const { unreadCount } = useTeamMessageUnread();
   const { palette, cardPresets } = useAppTheme();
   const [featuredUpdate, setFeaturedUpdate] = useState<TeamUpdate | null>(null);
+  const [chatSummary, setChatSummary] = useState<TeamMessageHomeSummary | null>(null);
+  const [nextEvent, setNextEvent] = useState<TeamEvent | null>(null);
   const [loadingFeatured, setLoadingFeatured] = useState(true);
+  const [loadingChat, setLoadingChat] = useState(true);
+  const [loadingCalendar, setLoadingCalendar] = useState(true);
   const [teamPickerVisible, setTeamPickerVisible] = useState(false);
   const [selectingTeamId, setSelectingTeamId] = useState<string | null>(null);
   const selectedTeamIdRef = useRef<string | null>(null);
@@ -51,6 +62,7 @@ export function HomeScreen() {
   selectedTeamIdRef.current = selectedTeam?.id ?? null;
 
   const canSwitchTeam = memberships.length > 1;
+  const canCreateUpdate = canEditPlayMetadata(selectedTeamMemberRole);
 
   const handleSelectTeam = async (teamId: string) => {
     setSelectingTeamId(teamId);
@@ -61,7 +73,7 @@ export function HomeScreen() {
 
   const loadFeaturedUpdate = useCallback(async (teamId: string) => {
     try {
-      const update = await fetchFeaturedTeamUpdate(teamId);
+      const update = await fetchLatestTeamUpdate(teamId);
 
       if (selectedTeamIdRef.current !== teamId) {
         return;
@@ -81,18 +93,83 @@ export function HomeScreen() {
     }
   }, []);
 
+  const loadChatSummary = useCallback(async (teamId: string, options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+
+    if (!silent) {
+      setLoadingChat(true);
+    }
+
+    try {
+      const summary = await fetchLatestTeamMessageSummary(teamId);
+
+      if (selectedTeamIdRef.current !== teamId) {
+        return;
+      }
+
+      setChatSummary(summary);
+    } catch {
+      if (selectedTeamIdRef.current !== teamId) {
+        return;
+      }
+
+      setChatSummary(null);
+    } finally {
+      if (!silent && selectedTeamIdRef.current === teamId) {
+        setLoadingChat(false);
+      }
+    }
+  }, []);
+
+  const loadNextEvent = useCallback(async (teamId: string) => {
+    try {
+      const event = await fetchNextUpcomingTeamEvent(teamId);
+
+      if (selectedTeamIdRef.current !== teamId) {
+        return;
+      }
+
+      setNextEvent(event);
+    } catch {
+      if (selectedTeamIdRef.current !== teamId) {
+        return;
+      }
+
+      setNextEvent(null);
+    } finally {
+      if (selectedTeamIdRef.current === teamId) {
+        setLoadingCalendar(false);
+      }
+    }
+  }, []);
+
+  const loadHomeDashboard = useCallback(
+    (teamId: string) => {
+      setLoadingFeatured(true);
+      setLoadingChat(true);
+      setLoadingCalendar(true);
+      void loadFeaturedUpdate(teamId);
+      void loadChatSummary(teamId);
+      void loadNextEvent(teamId);
+    },
+    [loadChatSummary, loadFeaturedUpdate, loadNextEvent],
+  );
+
   useFocusEffect(
     useCallback(() => {
       const teamId = selectedTeam?.id;
 
       if (!teamId) {
         setFeaturedUpdate(null);
+        setChatSummary(null);
+        setNextEvent(null);
         setLoadingFeatured(false);
+        setLoadingChat(false);
+        setLoadingCalendar(false);
         return;
       }
 
-      setLoadingFeatured(true);
-      void loadFeaturedUpdate(teamId);
+      loadHomeDashboard(teamId);
 
       const unsubscribe = subscribeTeamUpdatesByTeam(
         teamId,
@@ -107,14 +184,18 @@ export function HomeScreen() {
       );
 
       return unsubscribe;
-    }, [selectedTeam?.id, loadFeaturedUpdate]),
+    }, [loadFeaturedUpdate, loadHomeDashboard, selectedTeam?.id]),
   );
 
-  const unreadBadge = formatUnreadTabBadge(unreadCount);
-  const chatStatusText =
-    unreadCount > 0
-      ? `${unreadBadge} unread message${unreadCount === 1 ? '' : 's'}`
-      : 'All caught up — open Chat';
+  useEffect(() => {
+    const teamId = selectedTeam?.id;
+
+    if (!teamId) {
+      return;
+    }
+
+    void loadChatSummary(teamId, { silent: true });
+  }, [loadChatSummary, selectedTeam?.id, unreadCount]);
 
   const styles = useMemo(
     () =>
@@ -129,6 +210,24 @@ export function HomeScreen() {
           ...typography.label,
           color: palette.text.label,
           marginLeft: spacing.xs,
+        },
+        sectionHeaderRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: spacing.xs,
+        },
+        sectionHeaderLabel: {
+          ...typography.label,
+          color: palette.text.label,
+        },
+        addUpdateAction: {
+          ...typography.label,
+          color: palette.accent.default,
+          fontWeight: typography.subheading.fontWeight,
+        },
+        addUpdateActionPressed: {
+          opacity: 0.75,
         },
         sectionCard: {
           ...cardPresets.default.container,
@@ -166,40 +265,6 @@ export function HomeScreen() {
         featuredLoading: {
           paddingVertical: spacing.sm,
           alignItems: 'flex-start',
-        },
-        badgeRow: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: spacing.sm,
-          marginBottom: spacing.sm,
-        },
-        featuredBadge: {
-          borderRadius: radius.xl,
-          borderWidth: 1,
-          borderColor: palette.accent.default,
-          paddingHorizontal: spacing.sm + 2,
-          paddingVertical: spacing.xs,
-        },
-        featuredBadgeText: {
-          fontSize: typography.caption.fontSize,
-          fontWeight: typography.label.fontWeight,
-          color: palette.accent.default,
-          textTransform: 'uppercase',
-          letterSpacing: typography.label.letterSpacing,
-        },
-        pinnedBadge: {
-          borderRadius: radius.xl,
-          borderWidth: 1,
-          borderColor: palette.text.label,
-          paddingHorizontal: spacing.sm + 2,
-          paddingVertical: spacing.xs,
-        },
-        pinnedBadgeText: {
-          fontSize: typography.caption.fontSize,
-          fontWeight: typography.label.fontWeight,
-          color: palette.text.label,
-          textTransform: 'uppercase',
-          letterSpacing: typography.label.letterSpacing,
         },
         cardText: {
           ...typography.subheading,
@@ -279,9 +344,21 @@ export function HomeScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Recent Update</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionHeaderLabel}>Recent Update</Text>
+            {canCreateUpdate ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Add team update"
+                onPress={() => navigation.navigate('Updates', { openCreate: true })}
+                style={({ pressed }) => [pressed && styles.addUpdateActionPressed]}
+              >
+                <Text style={styles.addUpdateAction}>+ Add</Text>
+              </Pressable>
+            ) : null}
+          </View>
           <Pressable
-            onPress={() => navigation.navigate('Updates')}
+            onPress={() => navigation.navigate('Updates', {})}
             style={({ pressed }) => [pressed && styles.cardPressed]}
           >
             <Card title="Team Update">
@@ -291,30 +368,15 @@ export function HomeScreen() {
                 </View>
               ) : featuredUpdate ? (
                 <>
-                  <View style={styles.badgeRow}>
-                    {featuredUpdate.show_on_home ? (
-                      <View style={styles.featuredBadge}>
-                        <Text style={styles.featuredBadgeText}>Featured</Text>
-                      </View>
-                    ) : null}
-                    {featuredUpdate.is_pinned ? (
-                      <View style={styles.pinnedBadge}>
-                        <Text style={styles.pinnedBadgeText}>Pinned</Text>
-                      </View>
-                    ) : null}
-                  </View>
-
-                  <Text style={styles.cardText}>{featuredUpdate.title}</Text>
-                  <Text style={styles.cardSubtext}>
-                    {previewTeamUpdateBody(featuredUpdate.body)}
+                  <Text style={styles.cardText}>
+                    {previewTeamUpdateBody(featuredUpdate.body, 200)}
                   </Text>
                   <Text style={styles.cardMeta}>
-                    {formatTeamUpdateType(featuredUpdate.update_type)} ·{' '}
                     {formatTeamUpdateDate(featuredUpdate.created_at)}
                   </Text>
                 </>
               ) : (
-                <Text style={styles.cardSubtext}>No update is currently featured on Home.</Text>
+                <Text style={styles.cardSubtext}>No team updates yet.</Text>
               )}
             </Card>
           </Pressable>
@@ -327,8 +389,21 @@ export function HomeScreen() {
             style={({ pressed }) => [pressed && styles.cardPressed]}
           >
             <View style={styles.sectionCard}>
-              <Text style={styles.cardText}>Team Messages</Text>
-              <Text style={styles.cardSubtext}>{chatStatusText}</Text>
+              {loadingChat ? (
+                <View style={styles.featuredLoading}>
+                  <ActivityIndicator size="small" color={palette.accent.default} />
+                </View>
+              ) : chatSummary ? (
+                <>
+                  <Text style={styles.cardText}>{chatSummary.channelLabel}</Text>
+                  <Text style={styles.cardSubtext}>{chatSummary.previewLine}</Text>
+                  <Text style={styles.cardMeta}>
+                    {formatTeamUpdateDate(chatSummary.created_at)}
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.cardSubtext}>All caught up — open Chat</Text>
+              )}
             </View>
           </Pressable>
         </View>
@@ -340,10 +415,24 @@ export function HomeScreen() {
             style={({ pressed }) => [pressed && styles.cardPressed]}
           >
             <View style={styles.sectionCard}>
-              <Text style={styles.cardText}>View your schedule</Text>
-              <Text style={styles.cardSubtext}>
-                Open Calendar to see upcoming events and practices.
-              </Text>
+              {loadingCalendar ? (
+                <View style={styles.featuredLoading}>
+                  <ActivityIndicator size="small" color={palette.accent.default} />
+                </View>
+              ) : nextEvent ? (
+                <>
+                  <Text style={styles.cardText}>{nextEvent.title}</Text>
+                  <Text style={styles.cardSubtext}>
+                    {formatTeamEventListDate(nextEvent.starts_at, nextEvent.ends_at)} ·{' '}
+                    {formatTeamEventListTimeRange(nextEvent.starts_at, nextEvent.ends_at)}
+                  </Text>
+                  {nextEvent.location?.trim() ? (
+                    <Text style={styles.cardMeta}>{nextEvent.location.trim()}</Text>
+                  ) : null}
+                </>
+              ) : (
+                <Text style={styles.cardSubtext}>No upcoming events</Text>
+              )}
             </View>
           </Pressable>
         </View>

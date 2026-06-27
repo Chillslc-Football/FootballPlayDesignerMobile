@@ -9,6 +9,10 @@ export function navigateToTab(tab: keyof RootTabParamList): boolean {
     return false;
   }
 
-  navigationRef.navigate(tab);
+  if (tab === 'Updates') {
+    navigationRef.navigate('Updates', {});
+  } else {
+    navigationRef.navigate(tab);
+  }
   return true;
 }

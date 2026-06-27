@@ -17,9 +17,9 @@ export type TeamUpdate = {
 
 export type CreateTeamUpdateInput = {
   teamId: string;
-  title: string;
   body: string;
-  update_type: TeamUpdateType;
-  is_pinned: boolean;
+  title?: string;
+  update_type?: TeamUpdateType;
+  is_pinned?: boolean;
   createdBy: string;
 };

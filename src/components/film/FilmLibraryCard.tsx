@@ -6,76 +6,73 @@ import { colors } from '../../theme';
 import { isUploadFilm, type TeamFilm } from '../../types/teamFilm';
 import { formatFilmProviderBadge, resolveFilmProvider } from '../../utils/filmProvider';
 import { isThumbnailSupported } from '../../utils/filmThumbnail';
-import { formatTeamFilmRelativeAddedDate } from '../../utils/teamFilmDisplay';
+import {
+  formatTeamFilmRelativeAddedDate,
+  previewTeamFilmNotes,
+} from '../../utils/teamFilmDisplay';
 
 type FilmLibraryCardProps = {
   film: TeamFilm;
   addedBy: string;
-  onOpen: (film: TeamFilm) => void;
-  onPress: (film: TeamFilm) => void;
-  onShare: (film: TeamFilm) => void;
+  onWatch: (film: TeamFilm) => void;
+  onShowOptions: (film: TeamFilm) => void;
 };
 
 const CARD_THUMBNAIL_HEIGHT = 72;
 
-export function FilmLibraryCard({ film, addedBy, onOpen, onPress, onShare }: FilmLibraryCardProps) {
+export function FilmLibraryCard({ film, addedBy, onWatch, onShowOptions }: FilmLibraryCardProps) {
   const provider = resolveFilmProvider(film.video_source, film.video_source_type);
   const providerBadge = formatFilmProviderBadge(provider);
   const showThumbnail = isThumbnailSupported(provider);
-
-  const handleShare = () => {
-    onShare(film);
-  };
+  const notesPreview = previewTeamFilmNotes(film.notes);
 
   return (
-    <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-      onPress={() => onPress(film)}
-    >
-      {showThumbnail ? (
-        <FilmThumbnail
-          videoSource={film.video_source}
-          provider={provider}
-          height={CARD_THUMBNAIL_HEIGHT}
-        />
-      ) : null}
+    <View style={styles.card}>
+      <Pressable
+        style={({ pressed }) => [styles.cardBody, pressed && styles.cardPressed]}
+        onPress={() => onWatch(film)}
+        accessibilityRole="button"
+        accessibilityLabel={`Watch ${film.title}`}
+      >
+        {showThumbnail ? (
+          <FilmThumbnail
+            videoSource={film.video_source}
+            provider={provider}
+            height={CARD_THUMBNAIL_HEIGHT}
+          />
+        ) : null}
 
-      <View style={styles.cardContent}>
-        <Text style={styles.title} numberOfLines={2}>
-          {showThumbnail || isUploadFilm(film) ? film.title : `🎥 ${film.title}`}
-        </Text>
+        <View style={styles.cardContent}>
+          <Text style={styles.title} numberOfLines={2}>
+            {showThumbnail || isUploadFilm(film) ? film.title : `🎥 ${film.title}`}
+          </Text>
 
-        <Text style={styles.providerBadge}>{providerBadge}</Text>
+          <Text style={styles.providerBadge}>{providerBadge}</Text>
 
-        <Text style={styles.meta}>
-          Added by {addedBy} · {formatTeamFilmRelativeAddedDate(film.created_at)}
-        </Text>
+          {notesPreview ? (
+            <Text style={styles.notesPreview} numberOfLines={2}>
+              {notesPreview}
+            </Text>
+          ) : null}
 
-        <View style={styles.actions}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionButton,
-              styles.openButton,
-              pressed && styles.actionPressed,
-            ]}
-            onPress={() => onOpen(film)}
-          >
-            <Text style={styles.openButtonText}>Open</Text>
-          </Pressable>
+          <Text style={styles.meta}>
+            Added by {addedBy} · {formatTeamFilmRelativeAddedDate(film.created_at)}
+          </Text>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionButton,
-              styles.shareButton,
-              pressed && styles.actionPressed,
-            ]}
-            onPress={handleShare}
-          >
-            <Text style={styles.shareButtonText}>Share</Text>
-          </Pressable>
+          <Text style={styles.watchHint}>Tap to watch</Text>
         </View>
-      </View>
-    </Pressable>
+      </Pressable>
+
+      <Pressable
+        style={({ pressed }) => [styles.menuButton, pressed && styles.menuButtonPressed]}
+        onPress={() => onShowOptions(film)}
+        accessibilityLabel="Film options"
+        accessibilityRole="button"
+        hitSlop={8}
+      >
+        <Text style={styles.menuIcon}>⋮</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -85,6 +82,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     padding: 0,
     overflow: 'hidden',
+    position: 'relative',
+  },
+  cardBody: {
+    flex: 1,
   },
   cardPressed: {
     opacity: 0.92,
@@ -92,6 +93,7 @@ const styles = StyleSheet.create({
   cardContent: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+    paddingRight: spacing.xl + spacing.md,
   },
   title: {
     ...typography.body,
@@ -105,41 +107,39 @@ const styles = StyleSheet.create({
     fontWeight: typography.subheading.fontWeight,
     marginBottom: spacing.xs,
   },
+  notesPreview: {
+    ...typography.bodySmall,
+    color: palette.text.secondary,
+    lineHeight: typography.bodySmall.lineHeight,
+    marginBottom: spacing.xs,
+  },
   meta: {
     ...typography.caption,
     color: palette.text.muted,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
-  actions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+  watchHint: {
+    ...typography.caption,
+    color: colors.accent,
+    fontWeight: typography.subheading.fontWeight,
   },
-  actionButton: {
-    flex: 1,
-    borderRadius: 10,
-    paddingVertical: spacing.sm,
+  menuButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 36,
+    minHeight: 44,
+    minWidth: 44,
+    position: 'absolute',
+    right: spacing.xs,
+    top: spacing.xs,
+    zIndex: 1,
   },
-  openButton: {
-    backgroundColor: colors.accent,
+  menuButtonPressed: {
+    opacity: 0.7,
   },
-  shareButton: {
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  actionPressed: {
-    opacity: 0.85,
-  },
-  openButtonText: {
-    ...typography.bodySmall,
-    fontWeight: typography.subheading.fontWeight,
-    color: colors.background,
-  },
-  shareButtonText: {
-    ...typography.bodySmall,
-    fontWeight: typography.subheading.fontWeight,
-    color: colors.text,
+  menuIcon: {
+    color: palette.text.secondary,
+    fontSize: 22,
+    fontWeight: '700',
+    lineHeight: 24,
   },
 });

@@ -68,7 +68,7 @@ function ExternalFilmWatch({ videoSource, provider }: { videoSource: string; pro
   );
 }
 
-function UploadFilmWatch({ storagePath }: { storagePath: string }) {
+function UploadFilmWatch({ storagePath, title }: { storagePath: string; title?: string }) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -129,7 +129,7 @@ function UploadFilmWatch({ storagePath }: { storagePath: string }) {
     );
   }
 
-  return <UploadFilmPlayer signedUrl={signedUrl} />;
+  return <UploadFilmPlayer signedUrl={signedUrl} title={title} />;
 }
 
 export function WatchFilmScreen({ navigation, route }: Props) {
@@ -180,7 +180,7 @@ export function WatchFilmScreen({ navigation, route }: Props) {
   return (
     <View style={styles.container}>
       {provider === 'upload' ? (
-        <UploadFilmWatch storagePath={film.video_source} />
+        <UploadFilmWatch storagePath={film.video_source} title={film.title} />
       ) : (
         <ExternalFilmWatch videoSource={film.video_source} provider={provider} />
       )}

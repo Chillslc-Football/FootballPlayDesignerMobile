@@ -1,11 +1,14 @@
 import { StyleSheet, View } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
+import { FilmCastControls } from './FilmCastControls';
+
 type UploadFilmPlayerProps = {
   signedUrl: string;
+  title?: string;
 };
 
-export function UploadFilmPlayer({ signedUrl }: UploadFilmPlayerProps) {
+export function UploadFilmPlayer({ signedUrl, title }: UploadFilmPlayerProps) {
   const player = useVideoPlayer(signedUrl, (instance) => {
     instance.loop = false;
     instance.play();
@@ -20,6 +23,7 @@ export function UploadFilmPlayer({ signedUrl }: UploadFilmPlayerProps) {
         allowsFullscreen
         contentFit="contain"
       />
+      <FilmCastControls signedUrl={signedUrl} title={title} />
     </View>
   );
 }

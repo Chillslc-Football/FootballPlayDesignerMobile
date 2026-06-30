@@ -11,6 +11,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { CalendarEmptyState } from '../../components/calendar/CalendarEmptyState';
 import { FilmLibraryCard } from '../../components/film/FilmLibraryCard';
+import { FilmLibraryOptionsMenu } from '../../components/film/FilmLibraryOptionsMenu';
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { spacing, typography } from '../../design-system';
 import { fetchTeamFilmsByTeam } from '../../lib/filmRepository';
@@ -20,7 +21,8 @@ import { useTeam } from '../../team/TeamProvider';
 import { colors } from '../../theme';
 import type { TeamFilm } from '../../types/teamFilm';
 import { canEditPlayMetadata } from '../../utils/canEditPlayMetadata';
-import { resolvePublicFilmShareUrl, sharePublicFilmUrl } from '../../utils/filmShare';
+import { editTeamFilm, shareTeamFilm } from '../../utils/filmCardActions';
+import { confirmDeleteTeamFilm } from '../../utils/filmDeleteAction';
 
 type NavigationProp = NativeStackNavigationProp<FilmStackParamList, 'FilmLibrary'>;
 type FilmLibraryRouteProp = RouteProp<FilmStackParamList, 'FilmLibrary'>;
@@ -34,6 +36,7 @@ export function FilmLibraryScreen() {
   const [error, setError] = useState<string | null>(null);
   const [creatorNames, setCreatorNames] = useState<Record<string, string>>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [menuFilm, setMenuFilm] = useState<TeamFilm | null>(null);
   const loadedTeamIdRef = useRef<string | null>(null);
   const selectedTeamIdRef = useRef<string | null>(null);
   const successMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -42,15 +45,8 @@ export function FilmLibraryScreen() {
 
   selectedTeamIdRef.current = selectedTeam?.id ?? null;
 
-  useEffect(() => {
-    const message = route.params?.successMessage;
-
-    if (!message) {
-      return;
-    }
-
+  const showSuccessMessage = useCallback((message: string) => {
     setSuccessMessage(message);
-    navigation.setParams({ successMessage: undefined });
 
     if (successMessageTimerRef.current) {
       clearTimeout(successMessageTimerRef.current);
@@ -60,14 +56,27 @@ export function FilmLibraryScreen() {
       setSuccessMessage(null);
       successMessageTimerRef.current = null;
     }, 3000);
+  }, []);
 
+  useEffect(() => {
+    const message = route.params?.successMessage;
+
+    if (!message) {
+      return;
+    }
+
+    showSuccessMessage(message);
+    navigation.setParams({ successMessage: undefined });
+  }, [navigation, route.params?.successMessage, showSuccessMessage]);
+
+  useEffect(() => {
     return () => {
       if (successMessageTimerRef.current) {
         clearTimeout(successMessageTimerRef.current);
         successMessageTimerRef.current = null;
       }
     };
-  }, [navigation, route.params?.successMessage]);
+  }, []);
 
   const loadFilms = useCallback(async (teamId: string) => {
     setLoading(true);
@@ -130,37 +139,66 @@ export function FilmLibraryScreen() {
     navigation.navigate('FilmAddMethod');
   };
 
-  const handleOpenFilmDetail = (film: TeamFilm) => {
-    navigation.navigate('FilmDetail', { film });
-  };
-
-  const handleOpenFilm = (film: TeamFilm) => {
+  const handleWatchFilm = (film: TeamFilm) => {
     navigation.navigate('WatchFilm', { film });
   };
 
-  const handleShareFilm = useCallback(
-    async (film: TeamFilm) => {
-      const teamId = selectedTeam?.id;
+  const handleShowFilmOptions = useCallback((film: TeamFilm) => {
+    setMenuFilm(film);
+  }, []);
 
-      if (!teamId) {
+  const closeFilmOptions = useCallback(() => {
+    setMenuFilm(null);
+  }, []);
+
+  const handleMenuEdit = useCallback(() => {
+    if (!menuFilm) {
+      return;
+    }
+
+    const film = menuFilm;
+    closeFilmOptions();
+    editTeamFilm(navigation, film);
+  }, [closeFilmOptions, menuFilm, navigation]);
+
+  const handleMenuShare = useCallback(() => {
+    const teamId = selectedTeam?.id;
+
+    if (!menuFilm || !teamId) {
+      return;
+    }
+
+    const film = menuFilm;
+    closeFilmOptions();
+
+    void shareTeamFilm(teamId, film, canManageFilm).catch((shareError) => {
+      if (shareError instanceof Error && shareError.message.includes('User did not share')) {
         return;
       }
 
-      try {
-        const publicUrl = await resolvePublicFilmShareUrl(teamId, film, canManageFilm);
-        await sharePublicFilmUrl(publicUrl);
-      } catch (shareError) {
-        if (shareError instanceof Error && shareError.message.includes('User did not share')) {
-          return;
-        }
+      const message =
+        shareError instanceof Error ? shareError.message : 'Failed to share film link.';
+      setError(message);
+    });
+  }, [canManageFilm, closeFilmOptions, menuFilm, selectedTeam?.id]);
 
-        const message =
-          shareError instanceof Error ? shareError.message : 'Failed to share film link.';
-        setError(message);
-      }
-    },
-    [canManageFilm, selectedTeam?.id],
-  );
+  const handleMenuDelete = useCallback(() => {
+    const teamId = selectedTeam?.id;
+
+    if (!menuFilm || !teamId) {
+      return;
+    }
+
+    const film = menuFilm;
+    closeFilmOptions();
+
+    confirmDeleteTeamFilm({
+      film,
+      teamId,
+      navigation,
+      onError: setError,
+    });
+  }, [closeFilmOptions, menuFilm, navigation, selectedTeam?.id]);
 
   const emptyMessage = useMemo(() => {
     if (canManageFilm) {
@@ -218,11 +256,19 @@ export function FilmLibraryScreen() {
           key={film.id}
           film={film}
           addedBy={creatorNames[film.created_by] ?? 'Team member'}
-          onOpen={handleOpenFilm}
-          onPress={handleOpenFilmDetail}
-          onShare={handleShareFilm}
+          onWatch={handleWatchFilm}
+          onShowOptions={handleShowFilmOptions}
         />
       ))}
+
+      <FilmLibraryOptionsMenu
+        visible={menuFilm != null}
+        canManageFilm={canManageFilm}
+        onDismiss={closeFilmOptions}
+        onEdit={handleMenuEdit}
+        onShare={handleMenuShare}
+        onDelete={handleMenuDelete}
+      />
     </ScreenContainer>
   );
 }

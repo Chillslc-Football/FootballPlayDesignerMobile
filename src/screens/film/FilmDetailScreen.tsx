@@ -1,7 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -18,13 +17,13 @@ import { fetchProfileDisplayName } from '../../lib/teamRepository';
 import { FilmStackParamList } from '../../navigation/FilmStack';
 import { useTeam } from '../../team/TeamProvider';
 import { colors } from '../../theme';
-import { teamFilmToDraft, isUploadFilm } from '../../types/teamFilm';
+import { isUploadFilm } from '../../types/teamFilm';
 import { canEditPlayMetadata } from '../../utils/canEditPlayMetadata';
 import { formatFilmProviderBadge, resolveFilmProvider } from '../../utils/filmProvider';
 import { isThumbnailSupported } from '../../utils/filmThumbnail';
-import { resolvePublicFilmShareUrl, copyPublicFilmUrl, sharePublicFilmUrl } from '../../utils/filmShare';
 import { formatTeamFilmDate } from '../../utils/teamFilmDisplay';
 import { confirmDeleteTeamFilm } from '../../utils/filmDeleteAction';
+import { showFilmOptionsMenu } from '../../utils/filmCardActions';
 
 type Props = NativeStackScreenProps<FilmStackParamList, 'FilmDetail'>;
 
@@ -88,41 +87,6 @@ export function FilmDetailScreen({ navigation, route }: Props) {
     navigation.navigate('WatchFilm', { film });
   };
 
-  const handleShare = useCallback(async () => {
-    try {
-      const publicUrl = await resolvePublicFilmShareUrl(teamId, film, canManageFilm);
-      await sharePublicFilmUrl(publicUrl);
-    } catch (shareError) {
-      if (shareError instanceof Error && shareError.message.includes('User did not share')) {
-        return;
-      }
-
-      const message =
-        shareError instanceof Error ? shareError.message : 'Failed to share film link.';
-      setError(message);
-    }
-  }, [canManageFilm, film, teamId]);
-
-  const handleCopyLink = useCallback(async () => {
-    try {
-      const publicUrl = await resolvePublicFilmShareUrl(teamId, film, canManageFilm);
-      await copyPublicFilmUrl(publicUrl);
-      showActionMessage('Link copied');
-    } catch (copyError) {
-      const message =
-        copyError instanceof Error ? copyError.message : 'Failed to copy film link.';
-      setError(message);
-    }
-  }, [canManageFilm, film, showActionMessage, teamId]);
-
-  const handleEdit = useCallback(() => {
-    navigation.navigate('FilmForm', {
-      draft: teamFilmToDraft(film),
-      editingExisting: true,
-      isUpload,
-    });
-  }, [film, isUpload, navigation]);
-
   const handleDelete = useCallback(() => {
     confirmDeleteTeamFilm({
       film,
@@ -134,38 +98,16 @@ export function FilmDetailScreen({ navigation, route }: Props) {
   }, [film, navigation, teamId]);
 
   const showOverflowMenu = useCallback(() => {
-    const options: Array<{
-      text: string;
-      style?: 'cancel' | 'destructive' | 'default';
-      onPress?: () => void;
-    }> = [];
-
-    if (canManageFilm) {
-      options.push({ text: 'Edit', onPress: handleEdit });
-    }
-
-    options.push({
-      text: 'Share',
-      onPress: () => {
-        void handleShare();
-      },
+    showFilmOptionsMenu({
+      film,
+      teamId,
+      navigation,
+      canManageFilm,
+      onError: setError,
+      onActionMessage: showActionMessage,
+      onDeletingChange: setDeleting,
     });
-
-    options.push({
-      text: 'Copy Link',
-      onPress: () => {
-        void handleCopyLink();
-      },
-    });
-
-    if (canManageFilm) {
-      options.push({ text: 'Delete', style: 'destructive', onPress: handleDelete });
-    }
-
-    options.push({ text: 'Cancel', style: 'cancel' });
-
-    Alert.alert('Film options', undefined, options);
-  }, [canManageFilm, handleCopyLink, handleDelete, handleEdit, handleShare]);
+  }, [canManageFilm, film, navigation, showActionMessage, teamId]);
 
   useLayoutEffect(() => {
     navigation.setOptions({

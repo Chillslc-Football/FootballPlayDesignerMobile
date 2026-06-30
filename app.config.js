@@ -51,6 +51,12 @@ export default {
       ],
       'expo-video',
       '@react-native-community/datetimepicker',
+      [
+        'react-native-google-cast',
+        {
+          iosStartDiscoveryAfterFirstTapOnCastButton: true,
+        },
+      ],
     ],
     web: {
       favicon: './assets/favicon.png',

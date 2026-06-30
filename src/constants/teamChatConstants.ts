@@ -6,6 +6,7 @@ export const THREAD_KIND_LABELS: Record<TeamMessageThreadKind, string> = {
   players: 'Players',
   parents: 'Parents',
   direct: 'Direct Message',
+  custom: 'Group',
 };
 
 export function getConversationTitle(input: {

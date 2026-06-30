@@ -14,8 +14,8 @@ import type {
 } from '../types/teamMessage';
 import { resolveProfileDisplayName } from '../utils/profileDisplay';
 import {
-  formatHomeChatChannelLabel,
-  formatHomeChatPreviewLine,
+  formatConversationListTitle,
+  formatConversationPreviewLine,
 } from '../utils/teamMessageDisplay';
 
 type TeamMessageThreadRow = {
@@ -236,6 +236,34 @@ export async function getOrCreateTeamChatThread(teamId: string): Promise<TeamMes
   return rowToThread(data as TeamMessageThreadRow);
 }
 
+export async function createCustomGroupThread(
+  teamId: string,
+  name: string,
+  memberIds: string[],
+): Promise<TeamMessageThread> {
+  const trimmedName = name.trim();
+
+  if (trimmedName.length === 0) {
+    throw new Error('Group name is required.');
+  }
+
+  const { data, error } = await supabase.rpc('create_custom_group_thread', {
+    p_team_id: teamId,
+    p_name: trimmedName,
+    p_member_ids: memberIds,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data || typeof data !== 'object') {
+    throw new Error('Failed to create group.');
+  }
+
+  return rowToThread(data as TeamMessageThreadRow);
+}
+
 export async function fetchTeamMessagesByThread(
   teamId: string,
   threadId: string,
@@ -254,53 +282,122 @@ export async function fetchTeamMessagesByThread(
   return enrichMessagesWithSenderProfiles((data ?? []) as TeamMessageRow[]);
 }
 
+export async function fetchLatestMessagesByThreadIds(
+  teamId: string,
+  threadIds: string[],
+  options?: { excludeSenderId?: string },
+): Promise<Map<string, TeamMessage>> {
+  const uniqueThreadIds = [...new Set(threadIds)];
+  const excludeSenderId = options?.excludeSenderId;
+
+  if (uniqueThreadIds.length === 0) {
+    return new Map();
+  }
+
+  const latestRows = await Promise.all(
+    uniqueThreadIds.map(async (threadId) => {
+      let query = supabase
+        .from('team_messages')
+        .select(MESSAGE_COLUMNS)
+        .eq('team_id', teamId)
+        .eq('thread_id', threadId)
+        .is('deleted_at', null);
+
+      if (excludeSenderId) {
+        query = query.neq('sender_id', excludeSenderId);
+      }
+
+      const { data, error } = await query
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !data) {
+        return null;
+      }
+
+      return data as TeamMessageRow;
+    }),
+  );
+
+  const rows = latestRows.filter((row): row is TeamMessageRow => row != null);
+
+  if (rows.length === 0) {
+    return new Map();
+  }
+
+  const messages = await enrichMessagesWithSenderProfiles(rows);
+  const messagesByThreadId = new Map<string, TeamMessage>();
+
+  for (const message of messages) {
+    messagesByThreadId.set(message.thread_id, message);
+  }
+
+  return messagesByThreadId;
+}
+
 export async function fetchLatestTeamMessageSummary(
   teamId: string,
 ): Promise<TeamMessageHomeSummary | null> {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return null;
+  }
+
   const [channels, directMessages] = await Promise.all([
     listAccessibleTeamMessageThreads(teamId),
     listDirectMessageThreads(teamId),
   ]);
 
-  const threadsWithActivity = [...channels, ...directMessages].filter(
-    (thread) => thread.last_message_at != null,
-  );
+  const allThreads = [...channels, ...directMessages];
 
-  if (threadsWithActivity.length === 0) {
+  if (allThreads.length === 0) {
     return null;
   }
 
-  threadsWithActivity.sort(
-    (left, right) =>
-      new Date(right.last_message_at!).getTime() - new Date(left.last_message_at!).getTime(),
+  const latestMessagesByThreadId = await fetchLatestMessagesByThreadIds(
+    teamId,
+    allThreads.map((thread) => thread.id),
+    { excludeSenderId: user.id },
   );
 
-  const latestThread = threadsWithActivity[0];
-
-  const { data, error } = await supabase
-    .from('team_messages')
-    .select(MESSAGE_COLUMNS)
-    .eq('team_id', teamId)
-    .eq('thread_id', latestThread.id)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  if (!data) {
+  if (latestMessagesByThreadId.size === 0) {
     return null;
   }
 
-  const [message] = await enrichMessagesWithSenderProfiles([data as TeamMessageRow]);
+  let latestMessage: TeamMessage | null = null;
+
+  for (const message of latestMessagesByThreadId.values()) {
+    if (
+      !latestMessage ||
+      new Date(message.created_at).getTime() > new Date(latestMessage.created_at).getTime()
+    ) {
+      latestMessage = message;
+    }
+  }
+
+  if (!latestMessage) {
+    return null;
+  }
+
+  const latestThread = allThreads.find((thread) => thread.id === latestMessage.thread_id);
+
+  if (!latestThread) {
+    return null;
+  }
 
   return {
-    channelLabel: formatHomeChatChannelLabel(latestThread.thread_kind),
-    previewLine: formatHomeChatPreviewLine(message.sender_name, message.body),
-    created_at: message.created_at,
+    channelLabel: formatConversationListTitle(latestThread),
+    previewLine: formatConversationPreviewLine(
+      latestThread.thread_kind,
+      latestMessage.sender_name,
+      latestMessage.body,
+    ),
+    created_at: latestMessage.created_at,
   };
 }
 

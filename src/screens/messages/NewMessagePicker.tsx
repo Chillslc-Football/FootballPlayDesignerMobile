@@ -12,15 +12,39 @@ import {
 import { listDmEligibleMembers } from '../../lib/teamMessageRepository';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../theme';
-import type { DirectMessageEligibleMember } from '../../types/teamMessage';
+import type { DirectMessageEligibleMember, TeamMessageThreadKind } from '../../types/teamMessage';
 import type { ProfileNameFields } from '../../types/profile';
 import type { TeamRole } from '../../types/team';
 import { resolveProfileDisplayName } from '../../utils/profileDisplay';
 import { formatTeamRole } from '../../utils/roleLabels';
+import {
+  groupTargetMatchesQuery,
+  sortComposePickerGroupTargets,
+  validateComposeSelection,
+} from '../../utils/teamMessageDisplay';
+
+export type ComposeGroupTarget = {
+  kind: 'group';
+  id: string;
+  title: string;
+  threadKind: TeamMessageThreadKind;
+};
+
+export type ComposePersonTarget = {
+  kind: 'person';
+  userId: string;
+  title: string;
+  role: string;
+  member: DirectMessageEligibleMember;
+};
+
+export type ComposeTarget = ComposeGroupTarget | ComposePersonTarget;
 
 type NewMessagePickerProps = {
   teamId: string;
-  onSelectMember: (member: DirectMessageEligibleMember) => void;
+  groupTargets: ComposeGroupTarget[];
+  continuing?: boolean;
+  onContinue: (selected: ComposeTarget[]) => Promise<void>;
   onClose: () => void;
 };
 
@@ -48,6 +72,24 @@ function memberMatchesQuery(member: EnrichedMember, normalizedQuery: string): bo
     email.includes(normalizedQuery) ||
     role.includes(normalizedQuery)
   );
+}
+
+function composeTargetKey(target: ComposeTarget): string {
+  return target.kind === 'group' ? `group:${target.id}` : `person:${target.userId}`;
+}
+
+function toPersonTarget(member: EnrichedMember): ComposePersonTarget {
+  return {
+    kind: 'person',
+    userId: member.user_id,
+    title: memberLabel(member),
+    role: formatTeamRole(member.role as TeamRole),
+    member: {
+      user_id: member.user_id,
+      role: member.role,
+      display_name: member.display_name,
+    },
+  };
 }
 
 async function enrichMembersWithProfiles(
@@ -87,17 +129,25 @@ async function enrichMembersWithProfiles(
   });
 }
 
-export function NewMessagePicker({ teamId, onSelectMember, onClose }: NewMessagePickerProps) {
+export function NewMessagePicker({
+  teamId,
+  groupTargets,
+  continuing = false,
+  onContinue,
+  onClose,
+}: NewMessagePickerProps) {
   const [members, setMembers] = useState<EnrichedMember[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingMembers, setLoadingMembers] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [selectedTargetKeys, setSelectedTargetKeys] = useState<Set<string>>(() => new Set());
   const selectedTeamIdRef = useRef(teamId);
 
   selectedTeamIdRef.current = teamId;
 
   const loadMembers = useCallback(async (activeTeamId: string) => {
-    setLoading(true);
+    setLoadingMembers(true);
     setError(null);
 
     try {
@@ -125,7 +175,7 @@ export function NewMessagePicker({ teamId, onSelectMember, onClose }: NewMessage
       setError(message);
     } finally {
       if (selectedTeamIdRef.current === activeTeamId) {
-        setLoading(false);
+        setLoadingMembers(false);
       }
     }
   }, []);
@@ -134,15 +184,84 @@ export function NewMessagePicker({ teamId, onSelectMember, onClose }: NewMessage
     void loadMembers(teamId);
   }, [loadMembers, teamId]);
 
-  const filteredMembers = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+  const allTargets = useMemo((): ComposeTarget[] => {
+    const sortedGroups = sortComposePickerGroupTargets(groupTargets);
+    const people = [...members]
+      .sort((left, right) =>
+        memberLabel(left).localeCompare(memberLabel(right), undefined, { sensitivity: 'base' }),
+      )
+      .map(toPersonTarget);
 
+    return [...sortedGroups, ...people];
+  }, [groupTargets, members]);
+
+  const normalizedQuery = query.trim().toLowerCase();
+
+  const filteredTargets = useMemo(() => {
     if (!normalizedQuery) {
-      return members;
+      return allTargets;
     }
 
-    return members.filter((member) => memberMatchesQuery(member, normalizedQuery));
-  }, [members, query]);
+    return allTargets.filter((target) => {
+      if (target.kind === 'group') {
+        return groupTargetMatchesQuery(target, normalizedQuery);
+      }
+
+      const member = members.find((item) => item.user_id === target.userId);
+
+      return member ? memberMatchesQuery(member, normalizedQuery) : false;
+    });
+  }, [allTargets, members, normalizedQuery]);
+
+  const selectedTargets = useMemo(
+    () => allTargets.filter((target) => selectedTargetKeys.has(composeTargetKey(target))),
+    [allTargets, selectedTargetKeys],
+  );
+
+  const selectionValidationError = validateComposeSelection(selectedTargets);
+  const canContinue =
+    selectedTargets.length > 0 && selectionValidationError == null && !continuing && !loadingMembers;
+
+  const toggleTarget = (target: ComposeTarget) => {
+    if (continuing) {
+      return;
+    }
+
+    setSubmitError(null);
+    const key = composeTargetKey(target);
+
+    setSelectedTargetKeys((current) => {
+      const next = new Set(current);
+
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+
+      return next;
+    });
+  };
+
+  const handleContinue = async () => {
+    if (!canContinue) {
+      if (selectionValidationError) {
+        setSubmitError(selectionValidationError);
+      }
+
+      return;
+    }
+
+    setSubmitError(null);
+
+    try {
+      await onContinue(selectedTargets);
+    } catch (continueError) {
+      const message =
+        continueError instanceof Error ? continueError.message : 'Failed to start conversation.';
+      setSubmitError(message);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -151,6 +270,7 @@ export function NewMessagePicker({ teamId, onSelectMember, onClose }: NewMessage
         <Pressable
           style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}
           onPress={onClose}
+          disabled={continuing}
         >
           <Text style={styles.closeButtonText}>Cancel</Text>
         </Pressable>
@@ -160,52 +280,87 @@ export function NewMessagePicker({ teamId, onSelectMember, onClose }: NewMessage
         style={styles.searchInput}
         value={query}
         onChangeText={setQuery}
-        placeholder="Search team members..."
+        placeholder="Search groups and people..."
         placeholderTextColor={colors.textMuted}
         autoCapitalize="none"
         autoCorrect={false}
+        editable={!continuing}
       />
 
-      {loading ? (
+      {submitError ? <Text style={styles.errorText}>{submitError}</Text> : null}
+      {selectionValidationError && selectedTargets.length > 0 && !submitError ? (
+        <Text style={styles.errorText}>{selectionValidationError}</Text>
+      ) : null}
+
+      {loadingMembers ? (
         <View style={styles.statusRow}>
           <ActivityIndicator size="small" color={colors.accent} />
-          <Text style={styles.statusText}>Loading team members...</Text>
+          <Text style={styles.statusText}>Loading recipients...</Text>
         </View>
       ) : error ? (
         <Text style={styles.errorText}>{error}</Text>
-      ) : filteredMembers.length === 0 ? (
-        <Text style={styles.statusText}>No team members found.</Text>
+      ) : filteredTargets.length === 0 ? (
+        <Text style={styles.statusText}>No recipients found.</Text>
       ) : (
         <ScrollView
-          style={styles.memberList}
+          style={styles.list}
           keyboardShouldPersistTaps="handled"
           nestedScrollEnabled
           showsVerticalScrollIndicator={false}
         >
-          {filteredMembers.map((member) => (
-            <Pressable
-              key={member.user_id}
-              style={({ pressed }) => [styles.memberRow, pressed && styles.memberRowPressed]}
-              onPress={() => onSelectMember(member)}
-            >
-              <Text style={styles.memberName}>{memberLabel(member)}</Text>
-              <Text style={styles.memberRole}>{formatTeamRole(member.role as TeamRole)}</Text>
-            </Pressable>
-          ))}
+          {filteredTargets.map((target) => {
+            const selected = selectedTargetKeys.has(composeTargetKey(target));
+
+            return (
+              <Pressable
+                key={composeTargetKey(target)}
+                style={({ pressed }) => [
+                  styles.row,
+                  selected && styles.rowSelected,
+                  pressed && styles.rowPressed,
+                ]}
+                onPress={() => toggleTarget(target)}
+                disabled={continuing}
+              >
+                <View style={styles.rowMain}>
+                  <Text style={styles.rowTitle}>{target.title}</Text>
+                  {target.kind === 'person' ? (
+                    <Text style={styles.rowSubtitle}>{target.role}</Text>
+                  ) : null}
+                </View>
+                <Text style={[styles.rowCheck, selected && styles.rowCheckSelected]}>
+                  {selected ? '✓' : ''}
+                </Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
       )}
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.primaryButton,
+          !canContinue && styles.primaryButtonDisabled,
+          canContinue && pressed && styles.primaryButtonPressed,
+        ]}
+        onPress={() => {
+          void handleContinue();
+        }}
+        disabled={!canContinue}
+      >
+        {continuing ? (
+          <ActivityIndicator size="small" color={colors.background} />
+        ) : (
+          <Text style={styles.primaryButtonText}>Next</Text>
+        )}
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    padding: 12,
-    marginBottom: 12,
+    flex: 1,
     gap: 10,
   },
   header: {
@@ -215,7 +370,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '700',
     color: colors.text,
   },
@@ -223,7 +378,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: colors.background,
+    backgroundColor: colors.card,
   },
   closeButtonPressed: {
     opacity: 0.85,
@@ -235,7 +390,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     minHeight: 44,
-    backgroundColor: colors.background,
+    backgroundColor: colors.card,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.cardBorder,
@@ -243,42 +398,83 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.text,
   },
+  list: {
+    flex: 1,
+  },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     paddingVertical: 8,
+    paddingHorizontal: 4,
   },
   statusText: {
     fontSize: 14,
     color: colors.textMuted,
     paddingVertical: 8,
+    paddingHorizontal: 4,
   },
   errorText: {
     fontSize: 14,
     color: colors.gold,
-    paddingVertical: 8,
-  },
-  memberList: {
-    maxHeight: 280,
-  },
-  memberRow: {
-    paddingVertical: 10,
+    paddingVertical: 4,
     paddingHorizontal: 4,
-    borderBottomWidth: 1,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.cardBorder,
   },
-  memberRowPressed: {
+  rowSelected: {
+    backgroundColor: colors.card,
+  },
+  rowPressed: {
     opacity: 0.85,
   },
-  memberName: {
+  rowMain: {
+    flex: 1,
+  },
+  rowTitle: {
     fontSize: 15,
     fontWeight: '600',
     color: colors.text,
   },
-  memberRole: {
+  rowSubtitle: {
     marginTop: 2,
     fontSize: 12,
     color: colors.textMuted,
+  },
+  rowCheck: {
+    width: 24,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
+  rowCheckSelected: {
+    color: colors.accent,
+  },
+  primaryButton: {
+    backgroundColor: colors.accent,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  primaryButtonDisabled: {
+    opacity: 0.55,
+  },
+  primaryButtonPressed: {
+    opacity: 0.9,
+  },
+  primaryButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.background,
   },
 });

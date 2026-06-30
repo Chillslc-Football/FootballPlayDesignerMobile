@@ -5,7 +5,8 @@ export type TeamMessageThreadKind =
   | 'coaches'
   | 'players'
   | 'parents'
-  | 'direct';
+  | 'direct'
+  | 'custom';
 
 export type TeamMessageThread = {
   id: string;

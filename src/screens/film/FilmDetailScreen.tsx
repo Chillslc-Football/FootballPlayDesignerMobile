@@ -5,14 +5,12 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import * as Clipboard from 'expo-clipboard';
 
 import { palette, spacing, typography } from '../../design-system';
 import { FilmThumbnail } from '../../components/film/FilmThumbnail';
@@ -24,7 +22,7 @@ import { teamFilmToDraft, isUploadFilm } from '../../types/teamFilm';
 import { canEditPlayMetadata } from '../../utils/canEditPlayMetadata';
 import { formatFilmProviderBadge, resolveFilmProvider } from '../../utils/filmProvider';
 import { isThumbnailSupported } from '../../utils/filmThumbnail';
-import { buildFilmSharePayload, getPublicFilmShareClipboardText, resolvePublicFilmShareUrl } from '../../utils/filmShare';
+import { resolvePublicFilmShareUrl, copyPublicFilmUrl, sharePublicFilmUrl } from '../../utils/filmShare';
 import { formatTeamFilmDate } from '../../utils/teamFilmDisplay';
 import { confirmDeleteTeamFilm } from '../../utils/filmDeleteAction';
 
@@ -93,7 +91,7 @@ export function FilmDetailScreen({ navigation, route }: Props) {
   const handleShare = useCallback(async () => {
     try {
       const publicUrl = await resolvePublicFilmShareUrl(teamId, film, canManageFilm);
-      await Share.share(buildFilmSharePayload(publicUrl));
+      await sharePublicFilmUrl(publicUrl);
     } catch (shareError) {
       if (shareError instanceof Error && shareError.message.includes('User did not share')) {
         return;
@@ -108,7 +106,7 @@ export function FilmDetailScreen({ navigation, route }: Props) {
   const handleCopyLink = useCallback(async () => {
     try {
       const publicUrl = await resolvePublicFilmShareUrl(teamId, film, canManageFilm);
-      await Clipboard.setStringAsync(getPublicFilmShareClipboardText(publicUrl));
+      await copyPublicFilmUrl(publicUrl);
       showActionMessage('Link copied');
     } catch (copyError) {
       const message =

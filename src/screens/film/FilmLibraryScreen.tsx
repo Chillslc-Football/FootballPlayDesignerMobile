@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
-  Share,
   StyleSheet,
   Text,
   View,
@@ -21,7 +20,7 @@ import { useTeam } from '../../team/TeamProvider';
 import { colors } from '../../theme';
 import type { TeamFilm } from '../../types/teamFilm';
 import { canEditPlayMetadata } from '../../utils/canEditPlayMetadata';
-import { buildFilmSharePayload, resolvePublicFilmShareUrl } from '../../utils/filmShare';
+import { resolvePublicFilmShareUrl, sharePublicFilmUrl } from '../../utils/filmShare';
 
 type NavigationProp = NativeStackNavigationProp<FilmStackParamList, 'FilmLibrary'>;
 type FilmLibraryRouteProp = RouteProp<FilmStackParamList, 'FilmLibrary'>;
@@ -149,7 +148,7 @@ export function FilmLibraryScreen() {
 
       try {
         const publicUrl = await resolvePublicFilmShareUrl(teamId, film, canManageFilm);
-        await Share.share(buildFilmSharePayload(publicUrl));
+        await sharePublicFilmUrl(publicUrl);
       } catch (shareError) {
         if (shareError instanceof Error && shareError.message.includes('User did not share')) {
           return;

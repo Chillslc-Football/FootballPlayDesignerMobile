@@ -1,3 +1,6 @@
+import * as Clipboard from 'expo-clipboard';
+import { Share } from 'react-native';
+
 import { buildPublicFilmShareUrl } from './filmLinkUrl';
 import type { TeamFilm } from '../types/teamFilm';
 import { enablePublicFilmShare } from '../lib/filmRepository';
@@ -5,20 +8,24 @@ import { enablePublicFilmShare } from '../lib/filmRepository';
 const PUBLIC_SHARE_DISABLED_MESSAGE =
   'This film is not shared publicly yet. Ask a coach to share it.';
 
-export function getPublicFilmShareClipboardText(publicUrl: string): string {
+export function formatPublicFilmShareUrl(publicUrl: string): string {
   return publicUrl.trim();
 }
 
 export function buildFilmSharePayload(publicUrl: string): {
-  title: string;
   message: string;
 } {
-  const url = getPublicFilmShareClipboardText(publicUrl);
-
   return {
-    title: 'Team film',
-    message: `Watch this film: ${url}`,
+    message: formatPublicFilmShareUrl(publicUrl),
   };
+}
+
+export async function sharePublicFilmUrl(publicUrl: string): Promise<void> {
+  await Share.share(buildFilmSharePayload(publicUrl));
+}
+
+export async function copyPublicFilmUrl(publicUrl: string): Promise<void> {
+  await Clipboard.setStringAsync(formatPublicFilmShareUrl(publicUrl));
 }
 
 export function getPublicFilmShareUrl(film: Pick<TeamFilm, 'is_public_shared' | 'share_token'>): string | null {

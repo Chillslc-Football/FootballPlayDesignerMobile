@@ -12,7 +12,11 @@ import { useStackScreenOptions } from '../design-system';
 import type { TeamFilm, TeamFilmDraft } from '../types/teamFilm';
 
 export type FilmStackParamList = {
-  FilmLibrary: undefined;
+  FilmLibrary:
+    | {
+        successMessage?: string;
+      }
+    | undefined;
   FilmAddMethod: undefined;
   FilmUpload: undefined;
   FilmDetail: {

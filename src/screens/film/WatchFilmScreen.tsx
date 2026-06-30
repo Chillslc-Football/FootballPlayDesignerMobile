@@ -1,5 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -7,7 +15,10 @@ import { UploadFilmPlayer } from '../../components/film/UploadFilmPlayer';
 import { palette, spacing, typography } from '../../design-system';
 import { createFilmSignedUrl } from '../../lib/filmStorageRepository';
 import { FilmStackParamList } from '../../navigation/FilmStack';
+import { useTeam } from '../../team/TeamProvider';
 import { colors } from '../../theme';
+import { confirmDeleteTeamFilm } from '../../utils/filmDeleteAction';
+import { canEditPlayMetadata } from '../../utils/canEditPlayMetadata';
 import { resolveFilmProvider } from '../../utils/filmProvider';
 import { getBrowserOpenHint } from '../../utils/teamFilmDisplay';
 
@@ -121,18 +132,73 @@ function UploadFilmWatch({ storagePath }: { storagePath: string }) {
   return <UploadFilmPlayer signedUrl={signedUrl} />;
 }
 
-export function WatchFilmScreen({ route }: Props) {
+export function WatchFilmScreen({ navigation, route }: Props) {
   const { film } = route.params;
+  const { selectedTeam, selectedTeamMemberRole } = useTeam();
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const canManageFilm = canEditPlayMetadata(selectedTeamMemberRole);
+  const teamId = selectedTeam?.id ?? film.team_id;
   const provider = resolveFilmProvider(film.video_source, film.video_source_type);
 
-  if (provider === 'upload') {
-    return <UploadFilmWatch storagePath={film.video_source} />;
-  }
+  const handleDelete = useCallback(() => {
+    confirmDeleteTeamFilm({
+      film,
+      teamId,
+      navigation,
+      onDeletingChange: setDeleting,
+      onError: setDeleteError,
+    });
+  }, [film, navigation, teamId]);
 
-  return <ExternalFilmWatch videoSource={film.video_source} provider={provider} />;
+  useLayoutEffect(() => {
+    if (!canManageFilm) {
+      navigation.setOptions({ headerRight: undefined });
+      return;
+    }
+
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable
+          style={({ pressed }) => [styles.headerDeleteButton, pressed && styles.buttonPressed]}
+          onPress={handleDelete}
+          disabled={deleting}
+          accessibilityLabel="Delete film"
+          accessibilityRole="button"
+        >
+          {deleting ? (
+            <ActivityIndicator color={colors.gold} size="small" />
+          ) : (
+            <Text style={styles.headerDeleteText}>Delete</Text>
+          )}
+        </Pressable>
+      ),
+    });
+  }, [canManageFilm, deleting, handleDelete, navigation]);
+
+  return (
+    <View style={styles.container}>
+      {provider === 'upload' ? (
+        <UploadFilmWatch storagePath={film.video_source} />
+      ) : (
+        <ExternalFilmWatch videoSource={film.video_source} provider={provider} />
+      )}
+
+      {deleteError ? (
+        <View style={styles.deleteErrorBanner}>
+          <Text style={styles.deleteErrorText}>{deleteError}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   browserContainer: {
     flex: 1,
     backgroundColor: colors.background,
@@ -201,5 +267,30 @@ const styles = StyleSheet.create({
     color: colors.gold,
     textAlign: 'center',
     lineHeight: typography.body.lineHeight,
+  },
+  headerDeleteButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Platform.OS === 'android' ? spacing.xs : 0,
+    minHeight: 36,
+    minWidth: 56,
+    paddingHorizontal: spacing.sm,
+  },
+  headerDeleteText: {
+    color: colors.gold,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  deleteErrorBanner: {
+    backgroundColor: colors.card,
+    borderTopColor: colors.cardBorder,
+    borderTopWidth: 1,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  deleteErrorText: {
+    ...typography.bodySmall,
+    color: colors.gold,
+    textAlign: 'center',
   },
 });

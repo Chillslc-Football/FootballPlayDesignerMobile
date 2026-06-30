@@ -1,7 +1,8 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -15,7 +16,6 @@ import * as Clipboard from 'expo-clipboard';
 
 import { palette, spacing, typography } from '../../design-system';
 import { FilmThumbnail } from '../../components/film/FilmThumbnail';
-import { deleteTeamFilm } from '../../lib/filmRepository';
 import { fetchProfileDisplayName } from '../../lib/teamRepository';
 import { FilmStackParamList } from '../../navigation/FilmStack';
 import { useTeam } from '../../team/TeamProvider';
@@ -24,7 +24,9 @@ import { teamFilmToDraft, isUploadFilm } from '../../types/teamFilm';
 import { canEditPlayMetadata } from '../../utils/canEditPlayMetadata';
 import { formatFilmProviderBadge, resolveFilmProvider } from '../../utils/filmProvider';
 import { isThumbnailSupported } from '../../utils/filmThumbnail';
-import { buildFilmSharePayload, formatTeamFilmDate } from '../../utils/teamFilmDisplay';
+import { buildFilmSharePayload, getPublicFilmShareClipboardText, resolvePublicFilmShareUrl } from '../../utils/filmShare';
+import { formatTeamFilmDate } from '../../utils/teamFilmDisplay';
+import { confirmDeleteTeamFilm } from '../../utils/filmDeleteAction';
 
 type Props = NativeStackScreenProps<FilmStackParamList, 'FilmDetail'>;
 
@@ -34,7 +36,8 @@ export function FilmDetailScreen({ navigation, route }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdByName, setCreatedByName] = useState<string | null>(null);
-  const [copyConfirmed, setCopyConfirmed] = useState(false);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const actionMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canManageFilm = canEditPlayMetadata(selectedTeamMemberRole);
   const notes = film.notes?.trim();
@@ -60,14 +63,37 @@ export function FilmDetailScreen({ navigation, route }: Props) {
     }, [film.created_by]),
   );
 
+  const showActionMessage = useCallback((message: string) => {
+    if (actionMessageTimerRef.current) {
+      clearTimeout(actionMessageTimerRef.current);
+    }
+
+    setActionMessage(message);
+    actionMessageTimerRef.current = setTimeout(() => {
+      setActionMessage(null);
+      actionMessageTimerRef.current = null;
+    }, 2000);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        if (actionMessageTimerRef.current) {
+          clearTimeout(actionMessageTimerRef.current);
+          actionMessageTimerRef.current = null;
+        }
+      };
+    }, []),
+  );
+
   const handleWatch = () => {
     navigation.navigate('WatchFilm', { film });
   };
 
-  const handleShare = async () => {
+  const handleShare = useCallback(async () => {
     try {
-      const payload = buildFilmSharePayload(film);
-      await Share.share(payload);
+      const publicUrl = await resolvePublicFilmShareUrl(teamId, film, canManageFilm);
+      await Share.share(buildFilmSharePayload(publicUrl));
     } catch (shareError) {
       if (shareError instanceof Error && shareError.message.includes('User did not share')) {
         return;
@@ -77,54 +103,87 @@ export function FilmDetailScreen({ navigation, route }: Props) {
         shareError instanceof Error ? shareError.message : 'Failed to share film link.';
       setError(message);
     }
-  };
+  }, [canManageFilm, film, teamId]);
 
-  const handleCopyLink = async () => {
+  const handleCopyLink = useCallback(async () => {
     try {
-      await Clipboard.setStringAsync(film.video_source);
-      setCopyConfirmed(true);
-      setTimeout(() => setCopyConfirmed(false), 2000);
+      const publicUrl = await resolvePublicFilmShareUrl(teamId, film, canManageFilm);
+      await Clipboard.setStringAsync(getPublicFilmShareClipboardText(publicUrl));
+      showActionMessage('Link copied');
     } catch (copyError) {
       const message =
         copyError instanceof Error ? copyError.message : 'Failed to copy film link.';
       setError(message);
     }
-  };
+  }, [canManageFilm, film, showActionMessage, teamId]);
 
-  const handleEdit = () => {
+  const handleEdit = useCallback(() => {
     navigation.navigate('FilmForm', {
       draft: teamFilmToDraft(film),
       editingExisting: true,
       isUpload,
     });
-  };
+  }, [film, isUpload, navigation]);
 
-  const handleDelete = () => {
-    Alert.alert('Delete film?', 'Delete this film from the team library? This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            setDeleting(true);
-            setError(null);
+  const handleDelete = useCallback(() => {
+    confirmDeleteTeamFilm({
+      film,
+      teamId,
+      navigation,
+      onDeletingChange: setDeleting,
+      onError: setError,
+    });
+  }, [film, navigation, teamId]);
 
-            try {
-              await deleteTeamFilm(teamId, film);
-              navigation.popToTop();
-            } catch (deleteError) {
-              const message =
-                deleteError instanceof Error ? deleteError.message : 'Failed to delete team film.';
-              setError(message);
-            } finally {
-              setDeleting(false);
-            }
-          })();
-        },
+  const showOverflowMenu = useCallback(() => {
+    const options: Array<{
+      text: string;
+      style?: 'cancel' | 'destructive' | 'default';
+      onPress?: () => void;
+    }> = [];
+
+    if (canManageFilm) {
+      options.push({ text: 'Edit', onPress: handleEdit });
+    }
+
+    options.push({
+      text: 'Share',
+      onPress: () => {
+        void handleShare();
       },
-    ]);
-  };
+    });
+
+    options.push({
+      text: 'Copy Link',
+      onPress: () => {
+        void handleCopyLink();
+      },
+    });
+
+    if (canManageFilm) {
+      options.push({ text: 'Delete', style: 'destructive', onPress: handleDelete });
+    }
+
+    options.push({ text: 'Cancel', style: 'cancel' });
+
+    Alert.alert('Film options', undefined, options);
+  }, [canManageFilm, handleCopyLink, handleDelete, handleEdit, handleShare]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable
+          style={({ pressed }) => [styles.headerMenuButton, pressed && styles.buttonPressed]}
+          onPress={showOverflowMenu}
+          disabled={deleting}
+          accessibilityLabel="Film options"
+          accessibilityRole="button"
+        >
+          <Text style={styles.headerMenuIcon}>⋮</Text>
+        </Pressable>
+      ),
+    });
+  }, [deleting, navigation, showOverflowMenu]);
 
   return (
     <ScrollView
@@ -177,53 +236,30 @@ export function FilmDetailScreen({ navigation, route }: Props) {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <View style={styles.shareActions}>
-        <Pressable
-          style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
-          onPress={handleShare}
-          disabled={deleting}
-        >
-          <Text style={styles.secondaryButtonText}>Share</Text>
-        </Pressable>
+      {actionMessage ? (
+        <View style={styles.actionToast}>
+          <Text style={styles.actionToastText}>{actionMessage}</Text>
+        </View>
+      ) : null}
 
-        {!isUpload ? (
-          <Pressable
-            style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
-            onPress={handleCopyLink}
-            disabled={deleting}
-          >
-            <Text style={styles.secondaryButtonText}>
-              {copyConfirmed ? 'Link copied' : 'Copy Link'}
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
+      {deleting ? (
+        <View style={styles.deletingBlock}>
+          <ActivityIndicator color={colors.accent} size="small" />
+          <Text style={styles.deletingText}>Deleting film…</Text>
+        </View>
+      ) : null}
 
       {canManageFilm ? (
-        <View style={styles.manageActions}>
-          <Pressable
-            style={({ pressed }) => [styles.editButton, pressed && styles.buttonPressed]}
-            onPress={handleEdit}
-            disabled={deleting}
-          >
-            <Text style={styles.editButtonText}>Edit Film</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.deleteButton,
-              (deleting || pressed) && styles.buttonPressed,
-            ]}
-            onPress={handleDelete}
-            disabled={deleting}
-          >
-            {deleting ? (
-              <ActivityIndicator color={colors.gold} size="small" />
-            ) : (
-              <Text style={styles.deleteButtonText}>Delete Film</Text>
-            )}
-          </Pressable>
-        </View>
+        <Pressable
+          style={({ pressed }) => [
+            styles.deleteButton,
+            (deleting || pressed) && styles.buttonPressed,
+          ]}
+          onPress={handleDelete}
+          disabled={deleting}
+        >
+          <Text style={styles.deleteButtonText}>Delete Film</Text>
+        </Pressable>
       ) : null}
     </ScrollView>
   );
@@ -291,58 +327,61 @@ const styles = StyleSheet.create({
     color: colors.gold,
     marginBottom: spacing.md,
   },
-  shareActions: {
+  actionToast: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.card,
+    borderColor: colors.cardBorder,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  actionToastText: {
+    ...typography.bodySmall,
+    color: palette.text.primary,
+    fontWeight: typography.subheading.fontWeight,
+  },
+  deletingBlock: {
+    alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg,
+    marginTop: spacing.lg,
   },
-  secondaryButton: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
-  },
-  secondaryButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  manageActions: {
-    gap: spacing.sm,
-  },
-  editButton: {
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
+  deletingText: {
+    ...typography.bodySmall,
+    color: palette.text.secondary,
   },
   deleteButton: {
+    alignItems: 'center',
+    borderColor: colors.gold,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.gold,
+    justifyContent: 'center',
+    marginTop: spacing.lg,
+    minHeight: 44,
     paddingVertical: 12,
+  },
+  deleteButtonText: {
+    color: colors.gold,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  headerMenuButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 44,
+    marginRight: Platform.OS === 'android' ? spacing.xs : 0,
+    minHeight: 36,
+    minWidth: 36,
+    paddingHorizontal: spacing.sm,
+  },
+  headerMenuIcon: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: '700',
+    lineHeight: 24,
   },
   buttonPressed: {
     opacity: 0.85,
-  },
-  editButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.background,
-  },
-  deleteButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.gold,
   },
 });

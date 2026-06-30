@@ -1,4 +1,4 @@
-import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FilmThumbnail } from './FilmThumbnail';
 import { cardPresets, palette, spacing, typography } from '../../design-system';
@@ -6,24 +6,25 @@ import { colors } from '../../theme';
 import { isUploadFilm, type TeamFilm } from '../../types/teamFilm';
 import { formatFilmProviderBadge, resolveFilmProvider } from '../../utils/filmProvider';
 import { isThumbnailSupported } from '../../utils/filmThumbnail';
-import { buildFilmSharePayload, formatTeamFilmRelativeAddedDate } from '../../utils/teamFilmDisplay';
+import { formatTeamFilmRelativeAddedDate } from '../../utils/teamFilmDisplay';
 
 type FilmLibraryCardProps = {
   film: TeamFilm;
   addedBy: string;
   onOpen: (film: TeamFilm) => void;
   onPress: (film: TeamFilm) => void;
+  onShare: (film: TeamFilm) => void;
 };
 
 const CARD_THUMBNAIL_HEIGHT = 72;
 
-export function FilmLibraryCard({ film, addedBy, onOpen, onPress }: FilmLibraryCardProps) {
+export function FilmLibraryCard({ film, addedBy, onOpen, onPress, onShare }: FilmLibraryCardProps) {
   const provider = resolveFilmProvider(film.video_source, film.video_source_type);
   const providerBadge = formatFilmProviderBadge(provider);
   const showThumbnail = isThumbnailSupported(provider);
 
   const handleShare = () => {
-    void Share.share(buildFilmSharePayload(film));
+    onShare(film);
   };
 
   return (

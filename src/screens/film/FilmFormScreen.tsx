@@ -112,6 +112,7 @@ export function FilmFormScreen({ navigation, route }: Props) {
     const actionLabel = editingExisting ? 'Save' : 'Add';
 
     navigation.setOptions({
+      title: editingExisting ? 'Edit Film' : 'Paste Video Link',
       headerRight: () => (
         <Pressable
           style={({ pressed }) => [styles.headerAction, pressed && styles.headerActionPressed]}
@@ -204,7 +205,9 @@ export function FilmFormScreen({ navigation, route }: Props) {
         {saving ? (
           <ActivityIndicator color={colors.background} size="small" />
         ) : (
-          <Text style={styles.saveButtonText}>{editingExisting ? 'Save Film' : 'Add Film'}</Text>
+          <Text style={styles.saveButtonText}>
+            {editingExisting ? 'Save Changes' : 'Add Film'}
+          </Text>
         )}
       </Pressable>
     </ScrollView>

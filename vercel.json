@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/film/share/:shareToken",
+      "destination": "/"
+    },
+    {
+      "source": "/film/share/:shareToken/",
+      "destination": "/"
+    }
+  ]
+}

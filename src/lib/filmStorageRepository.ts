@@ -1,3 +1,4 @@
+import { getInvokeErrorMessage } from './supabaseInvoke';
 import { supabase } from './supabase';
 
 export const FILM_BUCKET = 'film';
@@ -11,6 +12,21 @@ const CACHE_REFRESH_BUFFER_MS = 60 * 60 * 1000;
 type CachedSignedUrl = {
   signedUrl: string;
   expiresAt: number;
+};
+
+type FilmDownloadUrlResponse = {
+  signedUrl?: string;
+  error?: string;
+};
+
+type FilmUploadUrlResponse = {
+  uploadUrl?: string;
+  error?: string;
+};
+
+type FilmDeleteObjectResponse = {
+  ok?: boolean;
+  error?: string;
 };
 
 const signedUrlCache = new Map<string, CachedSignedUrl>();
@@ -86,6 +102,26 @@ export function invalidateFilmSignedUrlCache(storagePath: string | null | undefi
   signedUrlCache.delete(normalized);
 }
 
+async function invokeFilmFunction<T extends { error?: string }>(
+  functionName: string,
+  body: Record<string, string>,
+  fallbackMessage: string,
+): Promise<T> {
+  const { data, error } = await supabase.functions.invoke(functionName, { body });
+
+  if (error) {
+    throw new Error(await getInvokeErrorMessage(error, fallbackMessage));
+  }
+
+  const response = data as T | null;
+
+  if (response?.error) {
+    throw new Error(response.error);
+  }
+
+  return response ?? ({} as T);
+}
+
 export async function createFilmSignedUrl(
   storagePath: string | null | undefined,
   options?: { forceRefresh?: boolean },
@@ -104,20 +140,22 @@ export async function createFilmSignedUrl(
     }
   }
 
-  const { data, error } = await supabase.storage
-    .from(FILM_BUCKET)
-    .createSignedUrl(normalized, FILM_SIGNED_URL_TTL_SECONDS);
+  const response = await invokeFilmFunction<FilmDownloadUrlResponse>(
+    'film-download-url',
+    { storagePath: normalized },
+    'Could not load team film.',
+  );
 
-  if (error || !data?.signedUrl) {
-    throw new Error(error?.message ?? 'Could not load team film.');
+  if (!response.signedUrl) {
+    throw new Error('Could not load team film.');
   }
 
   signedUrlCache.set(normalized, {
-    signedUrl: data.signedUrl,
+    signedUrl: response.signedUrl,
     expiresAt: Date.now() + FILM_SIGNED_URL_TTL_SECONDS * 1000,
   });
 
-  return data.signedUrl;
+  return response.signedUrl;
 }
 
 export async function uploadFilmFile(
@@ -137,13 +175,30 @@ export async function uploadFilmFile(
     throw new Error('Video is too large. Choose a file under 500 MB.');
   }
 
-  const { error } = await supabase.storage.from(FILM_BUCKET).upload(storagePath, arrayBuffer, {
-    contentType: mimeTypeForExtension(extension),
-    upsert: false,
+  const contentType = mimeTypeForExtension(extension);
+  const uploadResponse = await invokeFilmFunction<FilmUploadUrlResponse>(
+    'film-upload-url',
+    {
+      storagePath,
+      contentType,
+    },
+    'Could not prepare film upload.',
+  );
+
+  if (!uploadResponse.uploadUrl) {
+    throw new Error('Could not prepare film upload.');
+  }
+
+  const putResponse = await fetch(uploadResponse.uploadUrl, {
+    method: 'PUT',
+    body: arrayBuffer,
+    headers: {
+      'Content-Type': contentType,
+    },
   });
 
-  if (error) {
-    throw new Error(error.message);
+  if (!putResponse.ok) {
+    throw new Error('Failed to upload team film.');
   }
 }
 
@@ -154,11 +209,11 @@ export async function deleteFilmFile(storagePath: string | null | undefined): Pr
     return;
   }
 
-  const { error } = await supabase.storage.from(FILM_BUCKET).remove([normalized]);
-
-  if (error) {
-    throw new Error(error.message);
-  }
+  await invokeFilmFunction<FilmDeleteObjectResponse>(
+    'film-delete-object',
+    { storagePath: normalized },
+    'Could not delete team film.',
+  );
 
   invalidateFilmSignedUrlCache(normalized);
 }

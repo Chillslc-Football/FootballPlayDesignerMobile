@@ -1,4 +1,4 @@
-import type { TeamFilm, TeamFilmVideoSourceType } from '../types/teamFilm';
+import type { TeamFilmVideoSourceType } from '../types/teamFilm';
 import {
   getFilmProviderLabel,
   resolveFilmProvider,
@@ -128,25 +128,6 @@ export function validateTeamFilmForm(input: {
   }
 
   return null;
-}
-
-export function buildFilmSharePayload(film: TeamFilm): {
-  title: string;
-  message: string;
-  url?: string;
-} {
-  if (film.video_source_type === 'upload') {
-    return {
-      title: film.title,
-      message: `${film.title} — team film in Winner's Choice`,
-    };
-  }
-
-  return {
-    title: film.title,
-    message: `${film.title}\n${film.video_source}`,
-    url: film.video_source,
-  };
 }
 
 export function getBrowserOpenHint(provider: FilmProvider): string | null {

@@ -16,6 +16,8 @@ export type TeamFilm = {
   notes: string | null;
   video_source_type: TeamFilmVideoSourceType;
   video_source: string;
+  is_public_shared: boolean;
+  share_token: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -60,4 +62,8 @@ export function generateFilmId(): string {
 
 export function isUploadFilm(film: Pick<TeamFilm, 'video_source_type'>): boolean {
   return film.video_source_type === 'upload';
+}
+
+export function generateShareToken(): string {
+  return generateFilmId();
 }

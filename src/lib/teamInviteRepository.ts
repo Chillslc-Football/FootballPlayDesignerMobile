@@ -1,4 +1,5 @@
 import type { InviteRole } from '../types/teamRoster';
+import { getInvokeErrorMessage } from './supabaseInvoke';
 import { supabase } from './supabase';
 
 export type TeamInviteToken = {
@@ -9,35 +10,6 @@ type SendInviteEmailResponse = {
   ok?: boolean;
   error?: string;
 };
-
-async function getInvokeErrorMessage(error: unknown): Promise<string> {
-  if (!error || typeof error !== 'object') {
-    return 'Could not send invite email';
-  }
-
-  const invokeError = error as {
-    name?: string;
-    message?: string;
-    context?: Response;
-  };
-
-  if (invokeError.name === 'FunctionsHttpError' && invokeError.context instanceof Response) {
-    try {
-      const body = (await invokeError.context.json()) as SendInviteEmailResponse;
-      if (body.error) {
-        return body.error;
-      }
-    } catch {
-      // Fall through to generic message below.
-    }
-  }
-
-  if (typeof invokeError.message === 'string' && invokeError.message.length > 0) {
-    return invokeError.message;
-  }
-
-  return 'Could not send invite email';
-}
 
 export async function createTeamInvite(
   teamId: string,
@@ -85,7 +57,7 @@ export async function sendTeamInviteEmail(token: string): Promise<void> {
   });
 
   if (error) {
-    throw new Error(await getInvokeErrorMessage(error));
+    throw new Error(await getInvokeErrorMessage(error, 'Could not send invite email'));
   }
 
   const response = data as SendInviteEmailResponse | null;

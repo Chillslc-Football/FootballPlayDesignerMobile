@@ -1,6 +1,7 @@
 import { deleteFilmFile } from './filmStorageRepository';
 import { supabase } from './supabase';
 import type { TeamFilm, TeamFilmDraft, TeamFilmVideoSourceType } from '../types/teamFilm';
+import { generateShareToken } from '../types/teamFilm';
 import { detectVideoSourceType } from '../utils/teamFilmDisplay';
 
 type TeamFilmRow = {
@@ -10,13 +11,15 @@ type TeamFilmRow = {
   notes: string | null;
   video_source_type: string;
   video_source: string;
+  is_public_shared: boolean;
+  share_token: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
 };
 
 const COLUMNS =
-  'id, team_id, title, notes, video_source_type, video_source, created_by, created_at, updated_at';
+  'id, team_id, title, notes, video_source_type, video_source, is_public_shared, share_token, created_by, created_at, updated_at';
 
 const PERMISSION_ERROR_MESSAGE = 'You do not have permission to manage team film.';
 
@@ -59,6 +62,8 @@ function rowToFilm(row: TeamFilmRow): TeamFilm {
     notes: row.notes,
     video_source_type: row.video_source_type as TeamFilmVideoSourceType,
     video_source: row.video_source,
+    is_public_shared: row.is_public_shared ?? false,
+    share_token: row.share_token ?? null,
     created_by: row.created_by,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -98,6 +103,56 @@ export async function fetchTeamFilmsByTeam(teamId: string): Promise<TeamFilm[]> 
   }
 
   return ((data ?? []) as TeamFilmRow[]).map(rowToFilm);
+}
+
+export async function fetchTeamFilmById(teamId: string, filmId: string): Promise<TeamFilm | null> {
+  const { data, error } = await supabase
+    .from('team_films')
+    .select(COLUMNS)
+    .eq('team_id', teamId)
+    .eq('id', filmId)
+    .maybeSingle();
+
+  if (error) {
+    throwRepositoryError(error);
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return rowToFilm(data as TeamFilmRow);
+}
+
+export async function enablePublicFilmShare(teamId: string, filmId: string): Promise<TeamFilm> {
+  const existing = await fetchTeamFilmById(teamId, filmId);
+
+  if (!existing) {
+    throw new Error('Film not found.');
+  }
+
+  if (existing.is_public_shared && existing.share_token) {
+    return existing;
+  }
+
+  const shareToken = existing.share_token ?? generateShareToken();
+
+  const { data, error } = await supabase
+    .from('team_films')
+    .update({
+      is_public_shared: true,
+      share_token: shareToken,
+    })
+    .eq('team_id', teamId)
+    .eq('id', filmId)
+    .select(COLUMNS)
+    .single();
+
+  if (error) {
+    throwRepositoryError(error);
+  }
+
+  return rowToFilm(data as TeamFilmRow);
 }
 
 export async function createTeamFilm(

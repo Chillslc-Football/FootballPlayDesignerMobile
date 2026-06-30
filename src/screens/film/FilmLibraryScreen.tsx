@@ -1,12 +1,13 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { CalendarEmptyState } from '../../components/calendar/CalendarEmptyState';
@@ -20,22 +21,54 @@ import { useTeam } from '../../team/TeamProvider';
 import { colors } from '../../theme';
 import type { TeamFilm } from '../../types/teamFilm';
 import { canEditPlayMetadata } from '../../utils/canEditPlayMetadata';
+import { buildFilmSharePayload, resolvePublicFilmShareUrl } from '../../utils/filmShare';
 
 type NavigationProp = NativeStackNavigationProp<FilmStackParamList, 'FilmLibrary'>;
+type FilmLibraryRouteProp = RouteProp<FilmStackParamList, 'FilmLibrary'>;
 
 export function FilmLibraryScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<FilmLibraryRouteProp>();
   const { selectedTeam, selectedTeamMemberRole } = useTeam();
   const [films, setFilms] = useState<TeamFilm[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creatorNames, setCreatorNames] = useState<Record<string, string>>({});
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const loadedTeamIdRef = useRef<string | null>(null);
   const selectedTeamIdRef = useRef<string | null>(null);
+  const successMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canManageFilm = canEditPlayMetadata(selectedTeamMemberRole);
 
   selectedTeamIdRef.current = selectedTeam?.id ?? null;
+
+  useEffect(() => {
+    const message = route.params?.successMessage;
+
+    if (!message) {
+      return;
+    }
+
+    setSuccessMessage(message);
+    navigation.setParams({ successMessage: undefined });
+
+    if (successMessageTimerRef.current) {
+      clearTimeout(successMessageTimerRef.current);
+    }
+
+    successMessageTimerRef.current = setTimeout(() => {
+      setSuccessMessage(null);
+      successMessageTimerRef.current = null;
+    }, 3000);
+
+    return () => {
+      if (successMessageTimerRef.current) {
+        clearTimeout(successMessageTimerRef.current);
+        successMessageTimerRef.current = null;
+      }
+    };
+  }, [navigation, route.params?.successMessage]);
 
   const loadFilms = useCallback(async (teamId: string) => {
     setLoading(true);
@@ -106,6 +139,30 @@ export function FilmLibraryScreen() {
     navigation.navigate('WatchFilm', { film });
   };
 
+  const handleShareFilm = useCallback(
+    async (film: TeamFilm) => {
+      const teamId = selectedTeam?.id;
+
+      if (!teamId) {
+        return;
+      }
+
+      try {
+        const publicUrl = await resolvePublicFilmShareUrl(teamId, film, canManageFilm);
+        await Share.share(buildFilmSharePayload(publicUrl));
+      } catch (shareError) {
+        if (shareError instanceof Error && shareError.message.includes('User did not share')) {
+          return;
+        }
+
+        const message =
+          shareError instanceof Error ? shareError.message : 'Failed to share film link.';
+        setError(message);
+      }
+    },
+    [canManageFilm, selectedTeam?.id],
+  );
+
   const emptyMessage = useMemo(() => {
     if (canManageFilm) {
       return 'Game film shared here helps your team review together. Tap Add Film to get started.';
@@ -126,6 +183,12 @@ export function FilmLibraryScreen() {
 
   return (
     <ScreenContainer title="Film" subtitle={selectedTeam?.name}>
+      {successMessage ? (
+        <View style={styles.successToast}>
+          <Text style={styles.successToastText}>{successMessage}</Text>
+        </View>
+      ) : null}
+
       {canManageFilm ? (
         <Pressable
           style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
@@ -158,6 +221,7 @@ export function FilmLibraryScreen() {
           addedBy={creatorNames[film.created_by] ?? 'Team member'}
           onOpen={handleOpenFilm}
           onPress={handleOpenFilmDetail}
+          onShare={handleShareFilm}
         />
       ))}
     </ScreenContainer>
@@ -186,6 +250,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: colors.background,
+  },
+  successToast: {
+    backgroundColor: colors.card,
+    borderColor: colors.accent,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  successToastText: {
+    ...typography.bodySmall,
+    color: colors.text,
+    fontWeight: '700',
   },
   error: {
     ...typography.body,

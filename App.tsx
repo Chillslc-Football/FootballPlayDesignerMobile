@@ -1,4 +1,4 @@
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -11,11 +11,13 @@ import { notifyTeamMessageNavigationReady } from './src/notifications/teamMessag
 import { navigationRef } from './src/navigation/navigationRef';
 import { TabNavigator } from './src/navigation/TabNavigator';
 import { LoginScreen } from './src/screens/LoginScreen';
+import { PublicFilmShareScreen } from './src/screens/film/PublicFilmShareScreen';
 import { TeamSelectorScreen } from './src/screens/TeamSelectorScreen';
 import { TeamMessageUnreadProvider } from './src/team/TeamMessageUnreadProvider';
 import { TeamProvider, useTeam } from './src/team/TeamProvider';
 import { AppThemeProvider, useAppTheme } from './src/design-system';
 import { pushDebugLog } from './src/notifications/pushDebugLog';
+import { getWebPublicFilmShareToken } from './src/utils/filmLinkUrl';
 
 function LoadingView() {
   const { colors } = useAppTheme();
@@ -83,14 +85,29 @@ function AppContent() {
   );
 }
 
+function PublicWebFilmShareApp({ shareToken }: { shareToken: string }) {
+  return (
+    <>
+      <StatusBar style="light" />
+      <PublicFilmShareScreen shareToken={shareToken} />
+    </>
+  );
+}
+
 export default function App() {
+  const publicShareToken = Platform.OS === 'web' ? getWebPublicFilmShareToken() : null;
+
   return (
     <SafeAreaProvider>
       <AppThemeProvider>
-        <AuthProvider>
-          <StatusBar style="light" />
-          <AppContent />
-        </AuthProvider>
+        {publicShareToken ? (
+          <PublicWebFilmShareApp shareToken={publicShareToken} />
+        ) : (
+          <AuthProvider>
+            <StatusBar style="light" />
+            <AppContent />
+          </AuthProvider>
+        )}
       </AppThemeProvider>
     </SafeAreaProvider>
   );
